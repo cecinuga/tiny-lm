@@ -2,12 +2,66 @@ import torch
 import torch.nn as nn
 from dataclasses import dataclass
 
+@dataclass
 class GPTConfig:
     n_head:     int = 6   # number of attention heads
     n_emdb:     int = 384 # embedding dimension
     n_layer:    int = 6   # number of transformer blocks
     vocab_size: int = 65  # character-level: 65 unique chars in Shakespeare
     block_size: int = 256 # max sequence length (context window)
+
+class CausalSelfAttention:
+    def __init__(self, config:GPTConfig):
+        super().__init__()
+        assert config.n_emdb & config.n_head == 0
+        self.c_attn = nn.Linear(config.n_emdb, 3 * config.n_emdb) # Q, K, V projections
+        self.c_proj = nn.Linear(config.n_emdb, config.n_emdb)     # output projection
+        self.n_head = config.n_head
+        self.n_embd = config.n_emdb
+
+    def forward(self, x):
+        B, T, C = x.shape
+        qkv = self.c_attn(x)
+        q, k, v = qkv.split(self.n_embd, dim=2)
+
+        # reshape for multi-head: (B, T, C) -> (B, n_head, T, head_dim)
+        head_dim = C // self.n_head
+        q = q.view(B, T, self.n_head, head_dim).transpose(1, 2)
+        k = k.view(B, T, self.n_head, head_dim).transpose(1, 2)
+        v = v.view(B, T, self.n_head, head_dim).transpose(1, 2)
+
+        # attention with casual mask (each token can only attend to previous tokens)
+        y = torch.nn.functional.scaled_dot_product_attention(
+            q, k, v, is_causal=True
+        )
+
+        y = y.transpose(1, 2).contiguous().view(B, T, C)
+        return self.c_proj(y)
+
+class MLP(nn.Module):
+    def __init__(self, config:GPTConfig):
+        super().__init__()
+        self.c_cf = nn.Linear(config.n_emdb, 4 * config.n_emdb)
+        self.gelu = nn.GELU(approximate='tanh')
+        self.c_proj = nn.Linear(4 * config.n_emdb, config.n_emdb)
+
+    def forward(self, x):
+        x = self.c_cf(x) # project up: 384 -> 1536
+        x = self.gelu(x) # non-linearity
+        return self.c_proj # project back down: 1536 -> 384
+
+class Block(nn.Module):
+    def __init__(self, config:GPTConfig):
+        super().__init__()
+        self.ln_1 = nn.LayerNorm(config.n_emdb)
+        self.attn = CausalSelfAttention(config)
+        self.ln_2 = nn.LayerNorm(config.n_emdb)
+        self.mlp  = MLP(config)
+
+    def forward(self, x):
+        x = x + self.attn(self.ln_1(x)) # attention with residual connection
+        x = x + self.mlp(self.ln_2(x))  # MLP with residual connection
+        return x
 
 class GPT(nn.Module):
     def __init__(self, config: GPTConfig):
@@ -16,7 +70,7 @@ class GPT(nn.Module):
         self.transformer = nn.ModuleDict(dict(
             wte  = nn.Embedding(config.vocab_size, config.n_emdb), # token embeddings
             wpe  = nn.Embedding(config.block_size, config.n_emdb), # position embeddings
-            h    = nn.ModuleList([torch.Block(config) for _ in range(config.n_layer)]),
+            h    = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             ln_f = nn.LayerNorm(config.n_emdb),
         ))
         self.lm_head = nn.Linear(config.n_emdb, config.vocab_size, bias=False)
@@ -44,3 +98,8 @@ class GPT(nn.Module):
             )
 
         return logits, loss
+
+config = GPTConfig()
+model = GPT(config)
+n_params = sum(p.numel() for p in model.parameters())
+print(f"parameters: {n_params / 1e6:.1F}M")
