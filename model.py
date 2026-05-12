@@ -10,10 +10,10 @@ class GPTConfig:
     vocab_size: int = 65  # character-level: 65 unique chars in Shakespeare
     block_size: int = 256 # max sequence length (context window)
 
-class CausalSelfAttention:
+class CausalSelfAttention(nn.Module):
     def __init__(self, config:GPTConfig):
         super().__init__()
-        assert config.n_emdb & config.n_head == 0
+        assert config.n_emdb % config.n_head == 0
         self.c_attn = nn.Linear(config.n_emdb, 3 * config.n_emdb) # Q, K, V projections
         self.c_proj = nn.Linear(config.n_emdb, config.n_emdb)     # output projection
         self.n_head = config.n_head
@@ -48,7 +48,7 @@ class MLP(nn.Module):
     def forward(self, x):
         x = self.c_cf(x) # project up: 384 -> 1536
         x = self.gelu(x) # non-linearity
-        return self.c_proj # project back down: 1536 -> 384
+        return self.c_proj(x) # project back down: 1536 -> 384
 
 class Block(nn.Module):
     def __init__(self, config:GPTConfig):
