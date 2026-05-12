@@ -5,7 +5,7 @@ from dataclasses import dataclass
 @dataclass
 class GPTConfig:
     n_head:     int = 6   # number of attention heads
-    n_emdb:     int = 384 # embedding dimension
+    n_embd:     int = 384 # embedding dimension
     n_layer:    int = 6   # number of transformer blocks
     vocab_size: int = 65  # character-level: 65 unique chars in Shakespeare
     block_size: int = 256 # max sequence length (context window)
@@ -13,11 +13,11 @@ class GPTConfig:
 class CausalSelfAttention(nn.Module):
     def __init__(self, config:GPTConfig):
         super().__init__()
-        assert config.n_emdb % config.n_head == 0
-        self.c_attn = nn.Linear(config.n_emdb, 3 * config.n_emdb) # Q, K, V projections
-        self.c_proj = nn.Linear(config.n_emdb, config.n_emdb)     # output projection
+        assert config.n_embd % config.n_head == 0
+        self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd) # Q, K, V projections
+        self.c_proj = nn.Linear(config.n_embd, config.n_embd)     # output projection
         self.n_head = config.n_head
-        self.n_embd = config.n_emdb
+        self.n_embd = config.n_embd
 
     def forward(self, x):
         B, T, C = x.shape
@@ -41,21 +41,21 @@ class CausalSelfAttention(nn.Module):
 class MLP(nn.Module):
     def __init__(self, config:GPTConfig):
         super().__init__()
-        self.c_cf = nn.Linear(config.n_emdb, 4 * config.n_emdb)
+        self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd)
         self.gelu = nn.GELU(approximate='tanh')
-        self.c_proj = nn.Linear(4 * config.n_emdb, config.n_emdb)
+        self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
 
     def forward(self, x):
-        x = self.c_cf(x) # project up: 384 -> 1536
+        x = self.c_fc(x) # project up: 384 -> 1536
         x = self.gelu(x) # non-linearity
         return self.c_proj(x) # project back down: 1536 -> 384
 
 class Block(nn.Module):
     def __init__(self, config:GPTConfig):
         super().__init__()
-        self.ln_1 = nn.LayerNorm(config.n_emdb)
+        self.ln_1 = nn.LayerNorm(config.n_embd)
         self.attn = CausalSelfAttention(config)
-        self.ln_2 = nn.LayerNorm(config.n_emdb)
+        self.ln_2 = nn.LayerNorm(config.n_embd)
         self.mlp  = MLP(config)
 
     def forward(self, x):
@@ -68,12 +68,12 @@ class GPT(nn.Module):
         super().__init__()
         self.config = config
         self.transformer = nn.ModuleDict(dict(
-            wte  = nn.Embedding(config.vocab_size, config.n_emdb), # token embeddings
-            wpe  = nn.Embedding(config.block_size, config.n_emdb), # position embeddings
+            wte  = nn.Embedding(config.vocab_size, config.n_embd), # token embeddings
+            wpe  = nn.Embedding(config.block_size, config.n_embd), # position embeddings
             h    = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-            ln_f = nn.LayerNorm(config.n_emdb),
+            ln_f = nn.LayerNorm(config.n_embd),
         ))
-        self.lm_head = nn.Linear(config.n_emdb, config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
         self.transformer.wte.weight = self.lm_head.weight
 
     def forward(self, idx, targets=None):
