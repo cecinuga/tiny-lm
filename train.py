@@ -27,6 +27,7 @@ def get_lr(step, warmup_steps, max_steps, max_lr, min_lr):
         return min_lr
     
     progress = (step - warmup_steps) / (max_steps - warmup_steps)
+    return progress
 
 def load_data(filepath, block_size, batch_size, device):
     with open(filepath, 'r') as f:
@@ -106,7 +107,7 @@ def train(data_path, max_steps=5000, batch_size=64, n_layer=6, n_head=6, n_embd=
 
         if step > 0 and step % 100 == 0:
             model.eval()
-            sample = generate(model, "To be or not", stoi, itos,
+            sample = generate.generate(model, "To be or not", stoi, itos,
                             max_new_tokens=100, temperature=0.8)
             tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
             model.train()
@@ -134,4 +135,4 @@ def train(data_path, max_steps=5000, batch_size=64, n_layer=6, n_head=6, n_embd=
     return model, stoi, itos
 
 if __name__ == "__main__":
-    train("./data/shakespeare.txt")
+    train("./data/shakespeare.txt", n_layer=2, n_head=2, n_embd=128)
