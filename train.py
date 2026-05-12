@@ -8,16 +8,16 @@ import json
 from tqdm import tqdm
 
 def get_device():
-    if torch.backends.mps.is_avaible():
+    if torch.backends.mps.is_available():
         return torch.device("mps")
-    elif torch.cuda.is_avaible():
+    elif torch.cuda.is_available():
         return torch.device("cuda")
     return torch.device("cpu")
 
 def get_batch(block_size, batch_size, split_tokens, device=None):
     ix = torch.randint(len(split_tokens) - block_size-1, (batch_size,))
-    x = torch.stack([split_tokens[i:1 + block_size] for i in ix]).to(device)
-    y = torch.stack(split_tokens[i + 1:1 + block_size + 1] for i in ix).to(device)
+    x = torch.stack([split_tokens[i:i + block_size] for i in ix]).to(device)
+    y = torch.stack([split_tokens[i + 1:i + block_size + 1] for i in ix]).to(device)
     return x, y
 
 def get_lr(step, warmup_steps, max_steps, max_lr, min_lr):
@@ -62,7 +62,7 @@ def train(data_path, max_steps=5000, batch_size=64, n_layer=6, n_head=6, n_embd=
     )
     model = GPT(config).to(device)
     print(f"Model: {n_layer}L/{n_head}H/{n_embd}D, "
-          f"{sum(p.numbel() for p in model.parameters()) / 1e6:.1f}M params")
+          f"{sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params")
     
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
 
@@ -118,7 +118,7 @@ def train(data_path, max_steps=5000, batch_size=64, n_layer=6, n_head=6, n_embd=
                 "config":config,
                 "stoi":stoi,
                 "itos":itos,
-            }, f"checkpoint_{step}.pt")
+            }, f"checkpoints/checkpoint_{step}.pt")
 
     torch.save({
         "step": max_steps,
@@ -126,7 +126,7 @@ def train(data_path, max_steps=5000, batch_size=64, n_layer=6, n_head=6, n_embd=
         "config": config,
         "stoi": stoi,
         "itos": itos,
-    }, "checkpoint_final.pt")
+    }, "checkpoints/checkpoint_final.pt")
 
     with open("loss_log.json", "w") as f:
         json.dump(loss_log, f)
@@ -134,4 +134,4 @@ def train(data_path, max_steps=5000, batch_size=64, n_layer=6, n_head=6, n_embd=
     return model, stoi, itos
 
 if __name__ == "__main__":
-    train("../data/shakespeare.txt")
+    train("./data/shakespeare.txt")
