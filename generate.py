@@ -30,7 +30,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate text from a trained GPT checkpoint")
-    parser.add_argument("checkpoint", help="Path to checkpoint file (e.g. checkpoint_final.pt)")
+    parser.add_argument("--checkpoint", help="Path to checkpoint file (e.g. checkpoint_final.pt)")
     parser.add_argument("--prompt", default="To be or not", help="Starting text for generation")
     parser.add_argument("--max_new_tokens", type=int, default=200, help="Number of tokens to generate")
     parser.add_argument("--temperature", type=float, default=0.8, help="Sampling temperature (lower = more deterministic)")
