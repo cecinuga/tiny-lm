@@ -159,4 +159,4 @@ def train(
 
 
 if __name__ == "__main__":
-    train("./data/shakespeare.txt", n_layer=6, n_head=6, n_embd=256)
+    train("./data/shakespeare.txt", n_layer=6, n_head=6, n_embd=258)
