@@ -7,6 +7,7 @@ from tqdm import tqdm
 import generate
 from model import GPT, GPTConfig
 
+today = time.strftime('%Y%m%d')
 
 def get_device():
     if torch.backends.mps.is_available():
@@ -148,7 +149,7 @@ def train(
             "stoi": stoi,
             "itos": itos,
         },
-        f"checkpoints/L{config.n_layer}/H{config.n_head}/E{config.n_embd}/{time.strftime('%Y%m%d')}/checkpoint_final.pt",
+        f"checkpoints/L{config.n_layer}/H{config.n_head}/E{config.n_embd}/{today}/checkpoint_final.pt",
     )
 
     with open("loss_log.json", "w") as f:
@@ -158,4 +159,4 @@ def train(
 
 
 if __name__ == "__main__":
-    train("./data/shakespeare.txt", n_layer=2, n_head=2, n_embd=128)
+    train("./data/shakespeare.txt", n_layer=6, n_head=6, n_embd=256)
