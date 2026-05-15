@@ -2,6 +2,7 @@ import json
 import time
 
 import torch
+import math
 from tqdm import tqdm
 
 import generate
@@ -32,7 +33,7 @@ def get_lr(step, warmup_steps, max_steps, max_lr, min_lr):
         return min_lr
 
     progress = (step - warmup_steps) / (max_steps - warmup_steps)
-    return progress
+    return min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
 
 
 def load_data(filepath, block_size, batch_size, device):
@@ -49,38 +50,27 @@ def load_data(filepath, block_size, batch_size, device):
 
     n = int(0.9 * len(tokens))
     get_train = lambda: get_batch(block_size, batch_size, tokens[:n], device)
-    get_val = lambda: get_batch(block_size, batch_size, tokens[:n], device)
+    get_val = lambda: get_batch(block_size, batch_size, tokens[n:], device)
     return get_train, get_val, vocab_size, stoi, itos
 
 
 def train(
     data_path,
+    model:GPT,
+    config:GPTConfig,
     max_steps=5000,
     batch_size=64,
     n_layer=6,
     n_head=6,
     n_embd=384,
     block_size=256,
+    device=None
 ):
-    device = get_device()
-    print(f"Using device: {device}")
-
     get_train_batch, get_val_batch, vocab_size, stoi, itos = load_data(
         data_path, block_size, batch_size, device
     )
 
-    config = GPTConfig(
-        vocab_size=vocab_size,
-        block_size=block_size,
-        n_layer=n_layer,
-        n_embd=n_embd,
-        n_head=n_head,
-    )
-    model = GPT(config).to(device)
-    print(
-        f"Model: {n_layer}L/{n_head}H/{n_embd}D, "
-        f"{sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params"
-    )
+    config.vocab_size = vocab_size
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
 
@@ -160,4 +150,22 @@ def train(
 
 
 if __name__ == "__main__":
-    train("./data/shakespeare.txt", n_layer=6, n_head=6, n_embd=258)
+    device = get_device()
+    print(f"Using device: {device}")
+
+    n_layer = 6
+    n_head = 6
+    n_embd = 384
+    block_size = 256
+    config = GPTConfig(
+        block_size=block_size,
+        n_layer=n_layer,
+        n_embd=n_embd,
+        n_head=n_head,
+    )
+    model = GPT(config).to(device)
+    print(
+        f"Model: {n_layer}L/{n_head}H/{n_embd}D, "
+        f"{sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params"
+    )
+    train("./data/shakespeare.txt", model=model, config=config, n_layer=n_layer, n_head=n_head, n_embd=n_embd, device=device)
