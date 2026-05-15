@@ -7,7 +7,8 @@ from tqdm import tqdm
 import generate
 from model import GPT, GPTConfig
 
-today = time.strftime('%Y%m%d')
+today = time.strftime("%Y%m%d")
+
 
 def get_device():
     if torch.backends.mps.is_available():
@@ -138,7 +139,7 @@ def train(
                     "stoi": stoi,
                     "itos": itos,
                 },
-                f"checkpoints/checkpoint_{step}.pt",
+                f"checkpoints/{today}_L{config.n_layer}H{config.n_head}E{config.n_embd}_{step}_checkpoint.pt",
             )
 
     torch.save(
@@ -149,7 +150,7 @@ def train(
             "stoi": stoi,
             "itos": itos,
         },
-        f"checkpoints/L{config.n_layer}/H{config.n_head}/E{config.n_embd}/{today}/checkpoint_final.pt",
+        f"checkpoints/{today}_L{config.n_layer}H{config.n_head}E{config.n_embd}_{max_steps}_checkpoint_final.pt",
     )
 
     with open("loss_log.json", "w") as f:
