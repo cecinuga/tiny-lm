@@ -1,6 +1,5 @@
 import json
 import time
-
 import torch
 import math
 from tqdm import tqdm
@@ -10,6 +9,8 @@ from model import GPT, GPTConfig
 
 today = time.strftime("%Y%m%d")
 
+def checkpoint_name(step, config:GPTConfig, date=today, prefix="final"):
+    return f"{prefix}_{today}_L{config.n_layer}H{config.n_head}E{config.n_embd}_{step}"
 
 def get_device():
     if torch.backends.mps.is_available():
@@ -129,7 +130,7 @@ def train(
                     "stoi": stoi,
                     "itos": itos,
                 },
-                f"checkpoints/{today}_L{config.n_layer}H{config.n_head}E{config.n_embd}_{step}_checkpoint.pt",
+                f"checkpoints/{checkpoint_name(step, config, prefix="_checkpoint")}.pt",
             )
 
     torch.save(
@@ -140,7 +141,7 @@ def train(
             "stoi": stoi,
             "itos": itos,
         },
-        f"checkpoints/{today}_L{config.n_layer}H{config.n_head}E{config.n_embd}_{max_steps}_checkpoint_final.pt",
+        f"checkpoints/{checkpoint_name(max_steps, config, prefix="_checkpoint_final")}.pt",
     )
 
     with open("loss_log.json", "w") as f:
