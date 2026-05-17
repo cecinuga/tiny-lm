@@ -58,21 +58,6 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
 
 ## Improvement Ideas
 
-### 1. Add streaming in inference
-Stream the output tokens one by one rather than waiting for the model to generate all at once.
-
-### 2. Detect overfitting
-Compare training and validation loss at each eval step. If training loss keeps dropping but val loss stops improving (or rises), the model is overfitting — it is memorizing rather than generalizing.
-
-A simple early stopping rule: stop training if val loss has not improved in the last N evaluations.
-
-### 3. Add `argparse` to `train.py`
-Right now hyperparameters are hardcoded. Adding a CLI lets you run experiments without editing source:
-
-```bash
-python train.py --n_layer 4 --n_head 4 --n_embd 128 --max_steps 2000
-```
-
 ### 4. Try a different dataset
 Shakespeare is ~1MB. The model memorizes it quickly. Try a larger, noisier dataset — Project Gutenberg novels, Wikipedia dumps, or the TinyStories dataset on HuggingFace — to see how the model generalizes to a harder distribution.
 
@@ -90,12 +75,12 @@ grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 pbar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{lr:.2e}", gnorm=f"{grad_norm:.2f}")
 ```
 
+### 8. Add streaming in inference
+Stream the output tokens one by one rather than waiting for the model to generate all at once.
+
 ## TODO
 
 - [x] Checkpoint saving with config metadata
-- [ ] Fix Bug 1: cosine decay learning rate
-- [ ] Fix Bug 2: correct validation split
-- [ ] Fix Bug 3: `__main__` guard in `model.py`
 - [ ] Detect overfitting (compare train vs val loss curves)
 - [ ] Add `argparse` to `train.py`
 - [ ] Early stopping
