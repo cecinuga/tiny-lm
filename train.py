@@ -1,3 +1,4 @@
+import argparse
 import json
 import time
 import torch
@@ -162,19 +163,23 @@ if __name__ == "__main__":
     device = get_device()
     print(f"Using device: {device}")
 
-    n_layer = 6
-    n_head = 6
-    n_embd = 384
-    block_size = 256
+    parser = argparse.ArgumentParser(description="Train a GPT model")
+    parser.add_argument("--data", help="Path to dataset file (e.g. shakespeare.txt)")
+    parser.add_argument("--layer", default=6, help="Number of layers")
+    parser.add_argument("--head",  default=6, help="Number of heads")
+    parser.add_argument("--embd",  default=384, help="Embedding dimension")
+    parser.add_argument("--block", default=256, help="Block size")
+    args = parser.parse_args()
+
     config = GPTConfig(
-        block_size=block_size,
-        n_layer=n_layer,
-        n_embd=n_embd,
-        n_head=n_head,
+        block_size=args.block,
+        n_layer=args.layer,
+        n_embd=args.embd,
+        n_head=args.head,
     )
     model = GPT(config).to(device)
     print(
-        f"Model: {n_layer}L/{n_head}H/{n_embd}D, "
+        f"Model: {args.layer}L/{args.head}H/{args.embd}D, "
         f"{sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params"
     )
     train("./data/shakespeare.txt", model=model, config=config, device=device)
