@@ -3,8 +3,7 @@ import time
 import torch
 import math
 from tqdm import tqdm
-
-import generate
+from inference import generate
 from model import GPT, GPTConfig
 
 today = time.strftime("%Y%m%d")
@@ -79,7 +78,7 @@ def train(
     min_lr = max_lr * 0.1
     warmup_steps = 100
 
-    loss_log = {"steps": [], "train": [], "val": []}
+    loss_log = {"steps": [], "train": [], "val": [], "perplexity": []}
 
     pbar = tqdm(range(max_steps), desc="Training")
     for step in pbar:
@@ -92,7 +91,8 @@ def train(
                     _, loss = model(x, y)
                     val_losses.append(loss.item())
                 val_loss = sum(val_losses) / len(val_losses)
-                tqdm.write(f"Steps {step:5d} | val loss: {val_loss:.4f}")
+                perplexity = math.exp(val_loss)
+                tqdm.write(f"Steps {step:5d} | val loss: {val_loss:.4f} | perplexity: {perplexity:.1f}")
             model.train()
 
         lr = get_lr(step, warmup_steps, max_steps, max_lr, min_lr)
@@ -112,6 +112,7 @@ def train(
         loss_log["train"].append(loss.item())
         if step % 100 == 0:
             loss_log["val"].append(val_loss)
+            loss_log["perplexity"].append(perplexity)
 
         if step > 0 and step % 100 == 0:
             model.eval()
