@@ -2,14 +2,16 @@ import torch
 from model import GPT
 
 @torch.no_grad()
-def generate(model, prompt, stoi, itos, max_new_tokens=200, temperature=0.8, top_k=40):
+def generate(model:GPT, prompt, stoi, itos, max_new_tokens=200, temperature=0.8, top_k=40):
     device = next(model.parameters()).device
+
     tokens = [stoi[c] for c in prompt if c in stoi]
     idx = torch.tensor([tokens], dtype=torch.long, device=device)
 
     model.eval()
     for _ in range(max_new_tokens):
         idx_cond = idx[:, -model.config.block_size :]
+
         logits, _ = model(idx_cond)
         logits = logits[:, -1, :] / temperature
 
