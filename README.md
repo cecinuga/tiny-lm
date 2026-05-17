@@ -56,70 +56,13 @@ Key choices:
 
 Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch size 64.
 
-## Known Bugs (educational)
-
-These are real bugs in the current code — finding and fixing them is a great learning exercise:
-
-### Bug 1 — `get_lr()` returns the wrong value (`train.py:35`)
-
-```python
-# current (wrong): returns a float between 0.0 and 1.0, not a learning rate
-progress = (step - warmup_steps) / (max_steps - warmup_steps)
-return progress
-
-# correct: apply the cosine decay formula
-import math
-return min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
-```
-
-**Why it matters:** The optimizer receives a near-zero "learning rate" for most of training, so the model barely learns after the warmup phase. This is the single biggest performance bug in the project.
-
-### Bug 2 — Validation uses training data (`train.py:52`)
-
-```python
-# current (wrong): both lambdas use tokens[:n] (the training split)
-get_val = lambda: get_batch(block_size, batch_size, tokens[:n], device)
-
-# correct: use the held-out 10%
-get_val = lambda: get_batch(block_size, batch_size, tokens[n:], device)
-```
-
-**Why it matters:** The reported validation loss is actually training loss. You cannot detect overfitting this way because the model is evaluated on data it has already seen.
-
-### Bug 3 — `model.py` runs code on every import (`model.py:102-105`)
-
-```python
-# current (wrong): executes at import time
-config = GPTConfig()
-model = GPT(config)
-n_params = sum(p.numel() for p in model.parameters())
-print(f"parameters: {n_params / 1e6:.1F}M")
-
-# correct: guard with __main__
-if __name__ == "__main__":
-    config = GPTConfig()
-    model = GPT(config)
-    n_params = sum(p.numel() for p in model.parameters())
-    print(f"parameters: {n_params / 1e6:.1F}M")
-```
-
-**Why it matters:** Every `import model` (e.g., from `train.py`) allocates a full model on CPU and prints to stdout. It wastes memory and pollutes logs.
-
 ## Improvement Ideas
 
-These are not bugs — the code works — but implementing them will teach you important ML concepts:
-
-### 1. Add perplexity to logs
-Perplexity is `exp(cross_entropy_loss)` and is more interpretable than raw loss. A perplexity of 5 means the model is as uncertain as if it had to choose between 5 equally likely options at each step.
-
-```python
-import math
-perplexity = math.exp(val_loss)
-tqdm.write(f"Step {step:5d} | val loss: {val_loss:.4f} | perplexity: {perplexity:.1f}")
-```
+### 1. Add streaming in inference
+Stream the output tokens one by one rather than waiting for the model to generate all at once.
 
 ### 2. Detect overfitting
-After fixing Bug 2, compare training and validation loss at each eval step. If training loss keeps dropping but val loss stops improving (or rises), the model is overfitting — it is memorizing rather than generalizing.
+Compare training and validation loss at each eval step. If training loss keeps dropping but val loss stops improving (or rises), the model is overfitting — it is memorizing rather than generalizing.
 
 A simple early stopping rule: stop training if val loss has not improved in the last N evaluations.
 
