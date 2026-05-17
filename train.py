@@ -3,13 +3,25 @@ import time
 import torch
 import math
 from tqdm import tqdm
-from inference import generate
+import inference
 from model import GPT, GPTConfig
 
 today = time.strftime("%Y%m%d")
 
 def checkpoint_name(step, config:GPTConfig, date=today, prefix="final"):
     return f"{prefix}_{today}_L{config.n_layer}H{config.n_head}E{config.n_embd}_{step}"
+
+def save_checkpoint(model: GPT, config: GPTConfig, step, stoi, itos, prefix="checkpoint"):
+    torch.save(
+        {
+            "step": step,
+            "model_state_dict": model.state_dict(),
+            "config": config,
+            "stoi": stoi,
+            "itos": itos,
+        },
+        f"checkpoints/{checkpoint_name(step, config, prefix=prefix)}.pt",
+    )
 
 def get_device():
     if torch.backends.mps.is_available():
@@ -53,16 +65,12 @@ def load_data(filepath, block_size, batch_size, device):
     get_val = lambda: get_batch(block_size, batch_size, tokens[n:], device)
     return get_train, get_val, vocab_size, stoi, itos
 
-
 def train(
     data_path,
     model:GPT,
     config:GPTConfig,
     max_steps=5000,
     batch_size=64,
-    n_layer=6,
-    n_head=6,
-    n_embd=384,
     block_size=256,
     device=None
 ):
@@ -78,10 +86,16 @@ def train(
     min_lr = max_lr * 0.1
     warmup_steps = 100
 
+    best_val_loss = float('inf')
+    patience = 5          # quante valutazioni consecutive senza miglioramento
+    patience_counter = 0
+    early_stop = False
+
     loss_log = {"steps": [], "train": [], "val": [], "perplexity": []}
 
     pbar = tqdm(range(max_steps), desc="Training")
     for step in pbar:
+        # Evaluation
         if step % 100 == 0:
             model.eval()
             with torch.no_grad():
@@ -114,36 +128,29 @@ def train(
             loss_log["val"].append(val_loss)
             loss_log["perplexity"].append(perplexity)
 
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                patience_counter = 0
+                save_checkpoint(model, config, step, stoi, itos, "best")
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    print("Overfitting detected, stopping early!!!")
+                    break
+
         if step > 0 and step % 100 == 0:
             model.eval()
-            sample = generate.generate(
+            sample = inference.generate(
                 model, "To be or not", stoi, itos, max_new_tokens=100, temperature=0.8
             )
             tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
             model.train()
 
         if step > 0 and step % 1000 == 0:
-            torch.save(
-                {
-                    "step": step,
-                    "model_state_dict": model.state_dict(),
-                    "config": config,
-                    "stoi": stoi,
-                    "itos": itos,
-                },
-                f"checkpoints/{checkpoint_name(step, config, prefix="_checkpoint")}.pt",
-            )
+            save_checkpoint(model, config, step, stoi, itos, "checkpoint")
 
-    torch.save(
-        {
-            "step": max_steps,
-            "model_state_dict": model.state_dict(),
-            "config": config,
-            "stoi": stoi,
-            "itos": itos,
-        },
-        f"checkpoints/{checkpoint_name(max_steps, config, prefix="_checkpoint_final")}.pt",
-    )
+    if not early_stop:
+        save_checkpoint(model, config, max_steps, stoi, itos, "final_checkpoint")
 
     with open("loss_log.json", "w") as f:
         json.dump(loss_log, f)
@@ -170,4 +177,4 @@ if __name__ == "__main__":
         f"Model: {n_layer}L/{n_head}H/{n_embd}D, "
         f"{sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params"
     )
-    train("./data/shakespeare.txt", model=model, config=config, n_layer=n_layer, n_head=n_head, n_embd=n_embd, device=device)
+    train("./data/shakespeare.txt", model=model, config=config, device=device)
