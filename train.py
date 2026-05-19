@@ -1,3 +1,4 @@
+from attr import s
 import argparse
 import json
 import time
@@ -125,14 +126,28 @@ def train(
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
-        pbar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{lr:.2e}")
+        pbar.set_postfix(perplexity=f"{perplexity}",loss=f"{loss.item():.4f}", lr=f"{lr:.2e}")
 
         loss_log["steps"].append(step)
         loss_log["train"].append(loss.item())
         if step % 100 == 0:
             loss_log["val"].append(val_loss)
             loss_log["perplexity"].append(perplexity)
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
 
+        if step > 0 and step % 100 == 0:
+            model.eval()
+            sample = inference.generate(
+                model, "Come stai ?", stoi, itos, max_new_tokens=100, temperature=0.8
+            )
+            tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
+            model.train()
+
+        if step > 0 and step % 1000 == 0:
+            save_checkpoint(model, config, step, stoi, itos, "checkpoint")
+
+        if step > 1500 and step % 100 == 0:
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 patience_counter = 0
@@ -142,17 +157,6 @@ def train(
                 if patience_counter >= patience:
                     print("Overfitting detected, stopping early!!!")
                     break
-
-        if step > 0 and step % 100 == 0:
-            model.eval()
-            sample = inference.generate(
-                model, "To be or not", stoi, itos, max_new_tokens=100, temperature=0.8
-            )
-            tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
-            model.train()
-
-        if step > 0 and step % 1000 == 0:
-            save_checkpoint(model, config, step, stoi, itos, "checkpoint")
 
     if not early_stop:
         save_checkpoint(model, config, args.max_steps, stoi, itos, "final_checkpoint")
