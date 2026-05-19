@@ -58,16 +58,21 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
 
 ## Improvement Ideas
 
-### 1. Try a different dataset
+### 0. Add TrainConfig class in train.py and insert variable used by training
+
+### 1. Saving inference sampling in a text file during training 
+I wanna save sampling inference in a unique text file, separating each sample with a delimiter.
+
+### 2. Try a different dataset
 Shakespeare is ~1MB. The model memorizes it quickly. Try a larger, noisier dataset — Project Gutenberg novels, Wikipedia dumps, or the TinyStories dataset on HuggingFace — to see how the model generalizes to a harder distribution.
 
-### 2. Subword tokenization
+### 3. Subword tokenization
 Character-level tokenization is simple but inefficient: each token carries little information, so the model needs a long context to understand meaning. Real language models (GPT, LLaMA) use BPE tokenizers that split text into subwords (e.g., "Shake" + "speare"). `tiktoken` is already in the dependencies — try replacing the character tokenizer with `tiktoken.get_encoding("gpt2")`.
 
-### 3. Experiment tracking
+### 4. Experiment tracking
 Saving losses to `loss_log.json` is a start. Plot them with matplotlib to see the learning curves. For bigger experiments, tools like [Weights & Biases](https://wandb.ai) or TensorBoard let you compare runs, visualize attention patterns, and track GPU utilization.
 
-### 4. Gradient norm monitoring
+### 5. Gradient norm monitoring
 The code already clips gradients (`clip_grad_norm_`). Also log the gradient norm before clipping — a suddenly large gradient norm often signals numerical instability or a bad batch.
 
 ```python
