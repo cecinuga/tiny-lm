@@ -47,7 +47,7 @@ def get_lr(step, warmup_steps, max_steps, max_lr, min_lr):
     return min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
 
 def load_data(filepath, block_size, batch_size, device):
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="latin-1") as f:
         text = f.read()
 
     chars = sorted(set(text))
@@ -64,19 +64,26 @@ def load_data(filepath, block_size, batch_size, device):
     return get_train, get_val, vocab_size, stoi, itos
 
 def train(
-    data_path,
-    model:GPT,
-    config:GPTConfig,
-    max_steps=5000,
-    batch_size=64,
-    block_size=256,
+    args: argparse.Namespace,
     device=None
 ):
     get_train_batch, get_val_batch, vocab_size, stoi, itos = load_data(
-        data_path, block_size, batch_size, device
+        args.data, args.block, args.batch, device
     )
 
-    config.vocab_size = vocab_size
+    config = GPTConfig(
+        block_size=args.block,
+        n_layer=args.layer,
+        vocab_size=vocab_size,
+        n_embd=args.embd,
+        n_head=args.head,
+    )
+    model = GPT(config).to(device)
+
+    print(
+        f"Model: {args.layer}L/{args.head}H/{args.embd}D, "
+        f"{sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params"
+    )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
 
@@ -91,7 +98,7 @@ def train(
 
     loss_log = {"steps": [], "train": [], "val": [], "perplexity": []}
 
-    pbar = tqdm(range(max_steps), desc="Training")
+    pbar = tqdm(range(args.max_steps), desc="Training")
     for step in pbar:
         # Evaluation
         if step % 100 == 0:
@@ -107,7 +114,7 @@ def train(
                 tqdm.write(f"Steps {step:5d} | val loss: {val_loss:.4f} | perplexity: {perplexity:.1f}")
             model.train()
 
-        lr = get_lr(step, warmup_steps, max_steps, max_lr, min_lr)
+        lr = get_lr(step, warmup_steps, args.max_steps, max_lr, min_lr)
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
@@ -148,7 +155,7 @@ def train(
             save_checkpoint(model, config, step, stoi, itos, "checkpoint")
 
     if not early_stop:
-        save_checkpoint(model, config, max_steps, stoi, itos, "final_checkpoint")
+        save_checkpoint(model, config, args.max_steps, stoi, itos, "final_checkpoint")
 
     with open("loss_log.json", "w") as f:
         json.dump(loss_log, f)
@@ -165,17 +172,8 @@ if __name__ == "__main__":
     parser.add_argument("--head",  default=6, help="Number of heads")
     parser.add_argument("--embd",  default=384, help="Embedding dimension")
     parser.add_argument("--block", default=256, help="Block size")
+    parser.add_argument("--batch", default=64, help="Batch size")
+    parser.add_argument("--max-steps", default=5000, help="Maximum number of training steps")
     args = parser.parse_args()
 
-    config = GPTConfig(
-        block_size=args.block,
-        n_layer=args.layer,
-        n_embd=args.embd,
-        n_head=args.head,
-    )
-    model = GPT(config).to(device)
-    print(
-        f"Model: {args.layer}L/{args.head}H/{args.embd}D, "
-        f"{sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params"
-    )
-    train(args.data, model=model, config=config, device=device)
+    train(args, device=device)
