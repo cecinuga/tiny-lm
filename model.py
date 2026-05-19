@@ -4,11 +4,11 @@ from dataclasses import dataclass
 
 @dataclass
 class GPTConfig:
-    n_head:     int = 6   # number of attention heads
-    n_embd:     int = 384 # embedding dimension
-    n_layer:    int = 6   # number of transformer blocks
-    vocab_size: int = 65  # character-level: 65 unique chars in Shakespeare
-    block_size: int = 256 # max sequence length (context window)
+    n_head:     int   # number of attention heads
+    n_embd:     int   # embedding dimension
+    n_layer:    int   # number of transformer blocks
+    vocab_size: int   # character-level: 65 unique chars in Shakespeare
+    block_size: int   # max sequence length (context window)
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, config:GPTConfig):
@@ -98,8 +98,3 @@ class GPT(nn.Module):
             )
 
         return logits, loss
-
-config = GPTConfig()
-model = GPT(config)
-n_params = sum(p.numel() for p in model.parameters())
-print(f"parameters: {n_params / 1e6:.1F}M")
