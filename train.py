@@ -31,13 +31,11 @@ def get_device():
         return torch.device("cuda")
     return torch.device("cpu")
 
-
 def get_batch(block_size, batch_size, split_tokens, device=None):
     ix = torch.randint(len(split_tokens) - block_size - 1, (batch_size,))
     x = torch.stack([split_tokens[i : i + block_size] for i in ix]).to(device)
     y = torch.stack([split_tokens[i + 1 : i + block_size + 1] for i in ix]).to(device)
     return x, y
-
 
 def get_lr(step, warmup_steps, max_steps, max_lr, min_lr):
     if step < warmup_steps:
@@ -47,7 +45,6 @@ def get_lr(step, warmup_steps, max_steps, max_lr, min_lr):
 
     progress = (step - warmup_steps) / (max_steps - warmup_steps)
     return min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
-
 
 def load_data(filepath, block_size, batch_size, device):
     with open(filepath, "r") as f:
@@ -158,7 +155,6 @@ def train(
 
     return model, stoi, itos
 
-
 if __name__ == "__main__":
     device = get_device()
     print(f"Using device: {device}")
@@ -182,4 +178,4 @@ if __name__ == "__main__":
         f"Model: {args.layer}L/{args.head}H/{args.embd}D, "
         f"{sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params"
     )
-    train("./data/shakespeare.txt", model=model, config=config, device=device)
+    train(args.data, model=model, config=config, device=device)
