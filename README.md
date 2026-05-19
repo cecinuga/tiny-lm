@@ -23,7 +23,7 @@ Checkpoints are saved in `checkpoints/` every 1000 steps and at the end of train
 
 **Generate text from a checkpoint:**
 ```bash
-python generate.py --checkpoint checkpoints/<your_checkpoint>.pt --prompt "To be or not"
+python inference.py --checkpoint checkpoints/<your_checkpoint>.pt --prompt "To be or not"
 ```
 
 Options:
@@ -58,16 +58,16 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
 
 ## Improvement Ideas
 
-### 4. Try a different dataset
+### 1. Try a different dataset
 Shakespeare is ~1MB. The model memorizes it quickly. Try a larger, noisier dataset — Project Gutenberg novels, Wikipedia dumps, or the TinyStories dataset on HuggingFace — to see how the model generalizes to a harder distribution.
 
-### 5. Subword tokenization
+### 2. Subword tokenization
 Character-level tokenization is simple but inefficient: each token carries little information, so the model needs a long context to understand meaning. Real language models (GPT, LLaMA) use BPE tokenizers that split text into subwords (e.g., "Shake" + "speare"). `tiktoken` is already in the dependencies — try replacing the character tokenizer with `tiktoken.get_encoding("gpt2")`.
 
-### 6. Experiment tracking
+### 3. Experiment tracking
 Saving losses to `loss_log.json` is a start. Plot them with matplotlib to see the learning curves. For bigger experiments, tools like [Weights & Biases](https://wandb.ai) or TensorBoard let you compare runs, visualize attention patterns, and track GPU utilization.
 
-### 7. Gradient norm monitoring
+### 4. Gradient norm monitoring
 The code already clips gradients (`clip_grad_norm_`). Also log the gradient norm before clipping — a suddenly large gradient norm often signals numerical instability or a bad batch.
 
 ```python
@@ -75,12 +75,5 @@ grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 pbar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{lr:.2e}", gnorm=f"{grad_norm:.2f}")
 ```
 
-### 8. Add streaming in inference
+### 5. Add streaming in inference
 Stream the output tokens one by one rather than waiting for the model to generate all at once.
-
-## TODO
-
-- [x] Checkpoint saving with config metadata
-- [ ] Detect overfitting (compare train vs val loss curves)
-- [ ] Add `argparse` to `train.py`
-- [ ] Early stopping
