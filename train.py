@@ -4,6 +4,7 @@ import json
 import time
 import torch
 import math
+import utils
 from tqdm import tqdm
 import inference
 from model import GPT, GPTConfig
@@ -64,6 +65,31 @@ def load_data(filepath, block_size, batch_size, device):
     get_val = lambda: get_batch(block_size, batch_size, tokens[n:], device)
     return get_train, get_val, vocab_size, stoi, itos
 
+@utils.static_vars(best_val_loss=float('inf'), patience=5)
+def health_check(model: GPT, config: GPTConfig, step:int, stoi, itos, val_loss: float, patience_counter: int, device=None) -> bool:
+    if step > 0 and step % 100 == 0:
+        model.eval()
+        sample = inference.generate(
+            model, "Come stai ?", stoi, itos, max_new_tokens=100, temperature=0.8
+        )
+        tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
+        model.train()
+
+    if step > 0 and step % 1000 == 0:
+        save_checkpoint(model, config, step, stoi, itos, "checkpoint")
+
+    if step > 1500 and step % 100 == 0:
+        if val_loss < health_check.best_val_loss:
+            health_check.patience = 0
+            save_checkpoint(model, config, step, stoi, itos, "best")
+        else:
+            health_check.patience += 1
+            if health_check.patience >= patience_counter:
+                print("Overfitting detected, stopping early!!!")
+                return False
+    return True
+
+
 def train(
     args: argparse.Namespace,
     device=None
@@ -93,9 +119,7 @@ def train(
     warmup_steps = 100
 
     best_val_loss = float('inf')
-    patience = 5          # quante valutazioni consecutive senza miglioramento
     patience_counter = 0
-    early_stop = False
 
     loss_log = {"steps": [], "train": [], "val": [], "perplexity": []}
 
@@ -126,7 +150,7 @@ def train(
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
-        pbar.set_postfix(perplexity=f"{perplexity}",loss=f"{loss.item():.4f}", lr=f"{lr:.2e}")
+        pbar.set_postfix(perplexity=f"{perplexity}", loss=f"{loss.item():.4f}", lr=f"{lr:.2e}")
 
         loss_log["steps"].append(step)
         loss_log["train"].append(loss.item())
@@ -136,27 +160,7 @@ def train(
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
 
-        if step > 0 and step % 100 == 0:
-            model.eval()
-            sample = inference.generate(
-                model, "Come stai ?", stoi, itos, max_new_tokens=100, temperature=0.8
-            )
-            tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
-            model.train()
-
-        if step > 0 and step % 1000 == 0:
-            save_checkpoint(model, config, step, stoi, itos, "checkpoint")
-
-        if step > 1500 and step % 100 == 0:
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                patience_counter = 0
-                save_checkpoint(model, config, step, stoi, itos, "best")
-            else:
-                patience_counter += 1
-                if patience_counter >= patience:
-                    print("Overfitting detected, stopping early!!!")
-                    break
+    early_stop = health_check(model, config, step, stoi, itos, val_loss, patience_counter, device)
 
     if not early_stop:
         save_checkpoint(model, config, args.max_steps, stoi, itos, "final_checkpoint")
