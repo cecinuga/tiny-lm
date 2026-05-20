@@ -65,8 +65,8 @@ def load_data(filepath, block_size, batch_size, device):
     get_val = lambda: get_batch(block_size, batch_size, tokens[n:], device)
     return get_train, get_val, vocab_size, stoi, itos
 
-@utils.static_vars(best_val_loss=float('inf'), patience=5)
-def health_check(model: GPT, config: GPTConfig, step:int, stoi, itos, val_loss: float, patience_counter: int, device=None) -> bool:
+@utils.static_vars(best_val_loss=float('inf'), patience_counter=0)
+def health_check(model: GPT, config: GPTConfig, step:int, stoi, itos, val_loss: float, patience: int) -> bool:
     if step > 0 and step % 100 == 0:
         model.eval()
         sample = inference.generate(
@@ -78,13 +78,14 @@ def health_check(model: GPT, config: GPTConfig, step:int, stoi, itos, val_loss: 
     if step > 0 and step % 1000 == 0:
         save_checkpoint(model, config, step, stoi, itos, "checkpoint")
 
-    if step > 1500 and step % 100 == 0:
+    if step > 200 and step % 100 == 0:
         if val_loss < health_check.best_val_loss:
-            health_check.patience = 0
+            health_check.best_val_loss = val_loss
+            health_check.patience_counter = 0
             save_checkpoint(model, config, step, stoi, itos, "best")
         else:
-            health_check.patience += 1
-            if health_check.patience >= patience_counter:
+            health_check.patience_counter += 1
+            if health_check.patience_counter >= patience:
                 print("Overfitting detected, stopping early!!!")
                 return False
     return True
@@ -117,9 +118,7 @@ def train(
     max_lr = 1e-3
     min_lr = max_lr * 0.1
     warmup_steps = 100
-
-    best_val_loss = float('inf')
-    patience_counter = 0
+    patience_counter = 5
 
     loss_log = {"steps": [], "train": [], "val": [], "perplexity": []}
 
@@ -143,12 +142,14 @@ def train(
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
+        """
         x, y = get_train_batch()
         _, loss = model(x, y)
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
+        """
 
         pbar.set_postfix(perplexity=f"{perplexity}", loss=f"{loss.item():.4f}", lr=f"{lr:.2e}")
 
@@ -157,12 +158,12 @@ def train(
         if step % 100 == 0:
             loss_log["val"].append(val_loss)
             loss_log["perplexity"].append(perplexity)
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
 
-    early_stop = health_check(model, config, step, stoi, itos, val_loss, patience_counter, device)
+        health = health_check(model, config, step, stoi, itos, val_loss, patience_counter, device)
+        if health is False:
+            break
 
-    if not early_stop:
+    if health is True:
         save_checkpoint(model, config, args.max_steps, stoi, itos, "final_checkpoint")
 
     with open("loss_log.json", "w") as f:
@@ -175,13 +176,13 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     parser = argparse.ArgumentParser(description="Train a GPT model")
-    parser.add_argument("--data", help="Path to dataset file (e.g. shakespeare.txt)")
-    parser.add_argument("--layer", default=6, help="Number of layers")
-    parser.add_argument("--head",  default=6, help="Number of heads")
-    parser.add_argument("--embd",  default=384, help="Embedding dimension")
-    parser.add_argument("--block", default=256, help="Block size")
-    parser.add_argument("--batch", default=64, help="Batch size")
-    parser.add_argument("--max-steps", default=5000, help="Maximum number of training steps")
+    parser.add_argument("--data", type=str, help="Path to dataset file (e.g. shakespeare.txt)")
+    parser.add_argument("--layer", type=int, default=6, help="Number of layers")
+    parser.add_argument("--head", type=int, default=6, help="Number of heads")
+    parser.add_argument("--embd",  type=int, default=384, help="Embedding dimension")
+    parser.add_argument("--block", type=int, default=256, help="Block size")
+    parser.add_argument("--batch", type=int, default=64, help="Batch size")
+    parser.add_argument("--max-steps", type=int, default=5000, help="Maximum number of training steps")
     args = parser.parse_args()
 
     train(args, device=device)
