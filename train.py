@@ -1,3 +1,4 @@
+from utils import save_checkpoint
 from attr import s
 import argparse
 import json
@@ -8,23 +9,6 @@ import utils
 from tqdm import tqdm
 import inference
 from model import GPT, GPTConfig
-
-today = time.strftime("%Y%m%d")
-
-def checkpoint_name(step, config:GPTConfig, date=today, prefix="final"):
-    return f"{prefix}_{today}_L{config.n_layer}H{config.n_head}E{config.n_embd}_{step}"
-
-def save_checkpoint(model: GPT, config: GPTConfig, step, stoi, itos, prefix="checkpoint"):
-    torch.save(
-        {
-            "step": step,
-            "model_state_dict": model.state_dict(),
-            "config": config,
-            "stoi": stoi,
-            "itos": itos,
-        },
-        f"checkpoints/{checkpoint_name(step, config, prefix=prefix)}.pt",
-    )
 
 def get_device():
     if torch.backends.mps.is_available():
@@ -118,7 +102,7 @@ def train(
     max_lr = 1e-3
     min_lr = max_lr * 0.1
     warmup_steps = 100
-    patience_counter = 5
+    patience = 5
 
     loss_log = {"steps": [], "train": [], "val": [], "perplexity": []}
 
@@ -142,14 +126,12 @@ def train(
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
-        """
         x, y = get_train_batch()
         _, loss = model(x, y)
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
-        """
 
         pbar.set_postfix(perplexity=f"{perplexity}", loss=f"{loss.item():.4f}", lr=f"{lr:.2e}")
 
@@ -159,7 +141,7 @@ def train(
             loss_log["val"].append(val_loss)
             loss_log["perplexity"].append(perplexity)
 
-        health = health_check(model, config, step, stoi, itos, val_loss, patience_counter, device)
+        health = health_check(model, config, step, stoi, itos, val_loss, patience)
         if health is False:
             break
 
