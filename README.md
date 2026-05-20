@@ -66,6 +66,7 @@ To detect overfitting the actual `val_loss` must fail the aforementioned control
  
 ### 2. Saving inference sampling in a text file during training 
 I wanna save sampling inference in a unique text file, separating each sample with a delimiter.
+Training samplice not work
 
 ### 3. Try a different dataset
 Shakespeare is ~1MB. The model memorizes it quickly. Try a larger, noisier dataset — Project Gutenberg novels, Wikipedia dumps, or the TinyStories dataset on HuggingFace — to see how the model generalizes to a harder distribution.
