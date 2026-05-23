@@ -5,9 +5,12 @@ __pycache__/
 
 # C extensions
 *.so
+
+# Internal folder & files
 loss_logs/
 loss_log*.json
 checkpoints/
+test.py
 
 # Distribution / packaging
 .Python
