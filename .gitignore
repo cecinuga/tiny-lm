@@ -5,8 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
-
-loss_log.json
+loss_logs/
+loss_log*.json
 checkpoints/
 
 # Distribution / packaging
