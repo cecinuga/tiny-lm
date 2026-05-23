@@ -49,29 +49,26 @@ def load_data(filepath, block_size, batch_size, device):
     get_val = lambda: get_batch(block_size, batch_size, tokens[n:], device)
     return get_train, get_val, vocab_size, stoi, itos
 
-@utils.static_vars(best_val_loss=float('inf'), patience_counter=0)
-def health_check(model: GPT, config: GPTConfig, step:int, stoi, itos, val_loss: float, patience: int) -> bool:
-    if step > 0 and step % 100 == 0:
-        model.eval()
-        sample = inference.generate(
-            model, "Come stai ?", stoi, itos, max_new_tokens=100, temperature=0.8
-        )
-        tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
-        model.train()
+def sampling(model: GPT, stoi, itos, step: int):
+    model.eval()
+    sample = inference.generate(
+        model, "Come stai ?", stoi, itos, max_new_tokens=100, temperature=0.8
+    )
+    tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
+    model.train()
 
-    if step > 0 and step % 1000 == 0:
-        save_checkpoint(model, config, step, stoi, itos, "checkpoint")
+@utils.static_vars(best_val_loss_log=[float('inf')], patience=0)
+def health_check(model: GPT, config: GPTConfig, step:int, stoi, itos, val_loss: float) -> bool:
+    if val_loss < health_check.best_val_loss_log[-1]:
+        health_check.best_val_loss_log.append(val_loss)
+        save_checkpoint(model, config, step, stoi, itos, "best")
+    else:
+        health_check.patience++
 
-    if step > 200 and step % 100 == 0:
-        if val_loss < health_check.best_val_loss:
-            health_check.best_val_loss = val_loss
-            health_check.patience_counter = 0
-            save_checkpoint(model, config, step, stoi, itos, "best")
-        else:
-            health_check.patience_counter += 1
-            if health_check.patience_counter >= patience:
-                print("Overfitting detected, stopping early!!!")
-                return False
+    if health_check.patience > len(health_check.best_val_loss_log)/2:
+        print("Overfitting detected, stopping early!!!")
+        return False
+
     return True
 
 
@@ -102,14 +99,16 @@ def train(
     max_lr = 1e-3
     min_lr = max_lr * 0.1
     warmup_steps = 100
-    patience = 5
+    health = True
+    valuation_step = int(args.max_steps/10)
+    health_step = int(args.max_steps/25)
 
     loss_log = {"steps": [], "train": [], "val": [], "perplexity": []}
 
     pbar = tqdm(range(args.max_steps), desc="Training")
     for step in pbar:
         # Evaluation
-        if step % 100 == 0:
+        if step % valuation_step == 0:
             model.eval()
             with torch.no_grad():
                 val_losses = []
@@ -137,11 +136,15 @@ def train(
 
         loss_log["steps"].append(step)
         loss_log["train"].append(loss.item())
-        if step % 100 == 0:
+        if step % valuation_step == 0:
             loss_log["val"].append(val_loss)
             loss_log["perplexity"].append(perplexity)
 
-        health = health_check(model, config, step, stoi, itos, val_loss, patience)
+        sampling(model, stoi, itos, step)
+
+        if step > 0 and step % health_step == 0:
+            health = health_check(model, config, step, stoi, itos, val_loss)
+
         if health is False:
             break
 
@@ -164,7 +167,7 @@ if __name__ == "__main__":
     parser.add_argument("--embd",  type=int, default=384, help="Embedding dimension")
     parser.add_argument("--block", type=int, default=256, help="Block size")
     parser.add_argument("--batch", type=int, default=64, help="Batch size")
-    parser.add_argument("--max-steps", type=int, default=5000, help="Maximum number of training steps")
+    parser.add_argument("--max-steps", type=int, default=2500, help="Maximum number of training steps")
     args = parser.parse_args()
 
     train(args, device=device)
