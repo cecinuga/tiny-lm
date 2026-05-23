@@ -1,5 +1,6 @@
+from dataclasses import dataclass
+from train_utils import load_data, save_checkpoint, model_arch, today, get_device, get_lr, TrainConfig
 from math import ceil
-from utils import save_checkpoint, model_arch, today
 from attr import s
 import argparse
 import json
@@ -9,46 +10,8 @@ import math
 import utils
 from tqdm import tqdm
 import inference
+from automapper import mapper
 from model import GPT, GPTConfig
-
-def get_device():
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    elif torch.cuda.is_available():
-        return torch.device("cuda")
-    return torch.device("cpu")
-
-def get_batch(block_size, batch_size, split_tokens, device=None):
-    ix = torch.randint(len(split_tokens) - block_size - 1, (batch_size,))
-    x = torch.stack([split_tokens[i : i + block_size] for i in ix]).to(device)
-    y = torch.stack([split_tokens[i + 1 : i + block_size + 1] for i in ix]).to(device)
-    return x, y
-
-def get_lr(step, warmup_steps, max_steps, max_lr, min_lr):
-    if step < warmup_steps:
-        return max_lr * (step + 1) / warmup_steps
-    if step >= max_steps:
-        return min_lr
-
-    progress = (step - warmup_steps) / (max_steps - warmup_steps)
-    return min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
-
-def load_data(filepath, block_size, batch_size, device):
-    with open(filepath, "r", encoding="latin-1") as f:
-        text = f.read()
-
-    chars = sorted(set(text))
-    vocab_size = len(chars)
-    stoi = {c: i for i, c in enumerate(chars)}
-    itos = {i: c for c, i in stoi.items()}
-
-    tokens = torch.tensor([stoi[c] for c in text], dtype=torch.long)
-    print(f"dataset: {len(tokens):,} chars, vocab_size: {vocab_size}")
-
-    n = int(0.9 * len(tokens))
-    get_train = lambda: get_batch(block_size, batch_size, tokens[:n], device)
-    get_val = lambda: get_batch(block_size, batch_size, tokens[n:], device)
-    return get_train, get_val, vocab_size, stoi, itos
 
 def sampling(model: GPT, stoi, itos, step: int):
     model.eval()
@@ -59,44 +22,37 @@ def sampling(model: GPT, stoi, itos, step: int):
     model.train()
 
 @utils.static_vars(best_val_loss_log=[float('inf')], best_val_loss=float('inf'), patience=0)
-def health_check(model: GPT, config: GPTConfig, step:int, stoi, itos, val_loss: float) -> bool:
-    #print(val_loss, health_check.patience)
-    print(health_check.best_val_loss_log)
-    if val_loss < health_check.best_val_loss_log[-1]:
-        health_check.patience = 0
-        health_check.best_val_loss = val_loss
-        health_check.best_val_loss_log.append(val_loss)
-        save_checkpoint(model, config, step, stoi, itos, "best")
+def overfit_detector(model: GPT, config: GPTConfig, step:int, stoi, itos, val_loss: float) -> bool:
+    """
+    returns True if the model is overfitting, False otherwise.
+    """
+    #print(val_loss, overfit_detector.patience)
+    if val_loss < overfit_detector.best_val_loss_log[-1]:
+        overfit_detector.patience = 0
+        overfit_detector.best_val_loss = val_loss
+        overfit_detector.best_val_loss_log.append(val_loss)
     else:
-        health_check.patience += 1
+        overfit_detector.patience += 1
 
-    if health_check.patience > ceil(len(health_check.best_val_loss_log)/2):
+    if overfit_detector.patience > ceil(len(overfit_detector.best_val_loss_log)/2):
         print(f"Overfitting detected, stopping early!!!")
-        print(f"actual_val_loss={val_loss}, best_val_loss={health_check.best_val_loss}, patience={health_check.patience}")
-        return False
+        print(f"actual_val_loss={val_loss}, best_val_loss={overfit_detector.best_val_loss}, patience={overfit_detector.patience}")
+        return True
 
-    return True
+    return False
 
 
 def train(
-    args: argparse.Namespace,
+    train_config: TrainConfig,
     device=None
 ):
-    get_train_batch, get_val_batch, vocab_size, stoi, itos = load_data(
-        args.data, args.block, args.batch, device
-    )
+    get_train_batch, get_val_batch, vocab_size, stoi, itos = load_data(train_config, device)
 
-    config = GPTConfig(
-        block_size=args.block,
-        n_layer=args.layer,
-        vocab_size=vocab_size,
-        n_embd=args.embd,
-        n_head=args.head,
-    )
-    model = GPT(config).to(device)
+    model_config = mapper.to(GPTConfig).map(train_config, fields_mapping={"vocab_size": vocab_size})
+    model = GPT(model_config).to(device)
 
     print(
-        f"Model: {args.layer}L/{args.head}H/{args.embd}D, "
+        f"Model: {train_config.n_layer}L/{train_config.n_head}H/{train_config.n_embd}D, "
         f"{sum(p.numel() for p in model.parameters()) / 1e6:.1f}M params"
     )
 
@@ -105,13 +61,13 @@ def train(
     max_lr = 1e-3
     min_lr = max_lr * 0.1
     warmup_steps = 100
-    health = True
-    valuation_step = int(args.max_steps/10)
-    health_step = int(args.max_steps/25)
+    overfitted = False
+    valuation_step = int(train_config.max_steps/10)
+    health_step = int(train_config.max_steps/25)
 
     loss_log = {"steps": [], "train": [], "val": [], "perplexity": []}
 
-    pbar = tqdm(range(args.max_steps), desc="Training")
+    pbar = tqdm(range(train_config.max_steps), desc="Training")
     for step in pbar:
         # Evaluation
         if step % valuation_step == 0:
@@ -127,7 +83,7 @@ def train(
                 tqdm.write(f"Steps {step:5d} | val loss: {val_loss:.4f} | perplexity: {perplexity:.1f}")
             model.train()
 
-        lr = get_lr(step, warmup_steps, args.max_steps, max_lr, min_lr)
+        lr = get_lr(step, warmup_steps, train_config.max_steps, max_lr, min_lr)
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
@@ -150,15 +106,17 @@ def train(
             sampling(model, stoi, itos, step)
 
         if step > 0 and step % health_step == 0:
-            health = health_check(model, config, step, stoi, itos, val_loss)
+            overfitted = overfit_detector(model, model_config, step, stoi, itos, val_loss)
+            if overfitted is False:
+                save_checkpoint(model, model_config, step, stoi, itos, train_config.out_checkpoint, "best")
 
-        if health is False:
+        if overfitted is True:
             break
 
-    if health is True:
-        save_checkpoint(model, config, args.max_steps, stoi, itos, "final_checkpoint")
+    if overfitted is False:
+        save_checkpoint(model, model_config, train_config.max_steps, stoi, itos, train_config.out_checkpoint, "final_checkpoint")
 
-    with open(f"loss_logs/loss_log_{today}_{model_arch(config)}.json", "w") as f:
+    with open(f"loss_logs/loss_log_{today}_{model_arch(model_config)}.json", "w") as f:
         json.dump(loss_log, f)
 
     return model, stoi, itos
@@ -168,17 +126,20 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     parser = argparse.ArgumentParser(description="Train a GPT model")
-    parser.add_argument("--data", type=str, default="data/promessi_sposi.txt", help="Path to dataset file (e.g. shakespeare.txt)")
-    parser.add_argument("--layer", type=int, default=6, help="Number of layers")
-    parser.add_argument("--head", type=int, default=6, help="Number of heads")
-    parser.add_argument("--embd",  type=int, default=384, help="Embedding dimension")
-    parser.add_argument("--block", type=int, default=256, help="Block size")
-    parser.add_argument("--batch", type=int, default=64, help="Batch size")
+    parser.add_argument("-d", "--data", type=str, default="data/promessi_sposi.txt", help="Path to dataset file (e.g. shakespeare.txt)")
+    parser.add_argument("-l", "--n-layer", type=int, default=6, help="Number of layers")
+    parser.add_argument("-H", "--n-head", type=int, default=6, help="Number of heads")
+    parser.add_argument("-e", "--n-embd", type=int, default=384, help="Embedding dimension")
+    parser.add_argument("-b", "--block-size", type=int, default=256, help="Block size")
+    parser.add_argument("-B", "--batch-size", type=int, default=64, help="Batch size")
     parser.add_argument("--max-steps", type=int, default=2500, help="Maximum number of training steps")
+    parser.add_argument("-o-chk", "--out-checkpoint", type=str, default="checkpoints/", help="Path to checkpoint file")
     args = parser.parse_args()
 
-    for _, (name, value) in enumerate(args.__dict__.items()):
+    train_config = mapper.to(TrainConfig).map(args)
+
+    for _, (name, value) in enumerate(train_config.__dict__.items()):
         print(f"{name} = {value}")
     print("-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+")
 
-    train(args, device=device)
+    train(train_config, device=device)
