@@ -20,7 +20,7 @@ def model_arch(config: GPTConfig):
     return f"L{config.n_layer}H{config.n_head}E{config.n_embd}"
 
 def checkpoint_name(step, config:GPTConfig, date=today, prefix="final"):
-    return f"{prefix}_{today}_{model_arch(config)}_{step}"
+    return f"{prefix}_{date}_{model_arch(config)}_{step}"
 
 def save_checkpoint(model: GPT, config: GPTConfig, step, stoi, itos, output_dir:str="checkpoints", prefix="checkpoint"):
     torch.save(
@@ -31,7 +31,7 @@ def save_checkpoint(model: GPT, config: GPTConfig, step, stoi, itos, output_dir:
             "stoi": stoi,
             "itos": itos,
         },
-        f"{output_dir}/{checkpoint_name(step, config, prefix=prefix)}.pt",
+        f"artifacts/checkpoints/{output_dir}/{checkpoint_name(step, config, prefix=prefix)}.pt",
     )
 
 def get_device():
@@ -72,3 +72,10 @@ def load_data(config: TrainConfig, device):
     get_train = lambda: get_batch(config.block_size, config.batch_size, tokens[:n], device)
     get_val = lambda: get_batch(config.block_size, config.batch_size, tokens[n:], device)
     return get_train, get_val, vocab_size, stoi, itos
+
+def static_vars(**kwargs):
+    def decorate(func):
+        for k in kwargs:
+            setattr(func, k, kwargs[k])
+        return func
+    return decorate

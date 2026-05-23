@@ -10,6 +10,7 @@ __pycache__/
 loss_logs/
 loss_log*.json
 checkpoints/
+artifacts/
 test.py
 test_train.sh
 

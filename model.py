@@ -30,7 +30,7 @@ class CausalSelfAttention(nn.Module):
         k = k.view(B, T, self.n_head, head_dim).transpose(1, 2)
         v = v.view(B, T, self.n_head, head_dim).transpose(1, 2)
 
-        # attention with casual mask (each token can only attend to previous tokens)
+        # attention with causal mask (each token can only attend to previous tokens)
         y = torch.nn.functional.scaled_dot_product_attention(
             q, k, v, is_causal=True
         )

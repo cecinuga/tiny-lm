@@ -1,5 +1,5 @@
 import torch
-from model import GPT
+from model import GPT, GPTConfig
 
 @torch.no_grad()
 def generate(model:GPT, prompt, stoi, itos, max_new_tokens=200, temperature=0.8, top_k=40):
@@ -26,9 +26,7 @@ def generate(model:GPT, prompt, stoi, itos, max_new_tokens=200, temperature=0.8,
     return "".join([itos[i] for i in idx[0].tolist()])
 
 if __name__ == "__main__":
-    import torch
     import argparse
-    from model import GPT
 
     parser = argparse.ArgumentParser(description="Generate text from a trained GPT checkpoint")
     parser.add_argument("--checkpoint", help="Path to checkpoint file (e.g. checkpoint_final.pt)")
@@ -42,7 +40,8 @@ if __name__ == "__main__":
     if args.seed is not None:
         torch.manual_seed(args.seed)
 
-    checkpoint = torch.load(args.checkpoint, weights_only=False)
+    torch.serialization.add_safe_globals([GPTConfig])
+    checkpoint = torch.load(args.checkpoint, weights_only=True)
     config = checkpoint["config"]
     stoi = checkpoint["stoi"]
     itos = checkpoint["itos"]
