@@ -58,31 +58,34 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
 
 ## Improvement Ideas
 
-### 0. Add TrainConfig class in train.py and insert variable used by training
+### 0. Improve saving checkpoint: check duplicate file name
+### 1. Improve saving loss_log: check duplicate file name
 
-### 2. Improove overfitting detection system
+### 2. Add TrainConfig class in train.py and insert variable used by training
+
+### 3. Improove overfitting detection system
 The term `value` refers to a general term that is used to measure the performance of the model.
 Save the last `n` `value` in an array, initialized with only `neutral value`, each successive element for being part to the array it must be greater than the last `n` values.
 To detect overfitting the actual `value` must fail the aforementioned control `m` times in a row, `m` is computed as `n / 2`.
 - 2.1 `value` = actual best_val_loss; `neutral value` = `float('inf')`
 - 2.2 `value` = gap between actual best_val_loss and train_loss; `neutral value` = `0`: the control is inverted, if to much value is appended to array the overfitting will be detected
  
-### 3. Saving inference sampling in a text file during training 
+### 4. Saving inference sampling in a text file during training 
 I wanna save sampling inference in a unique text file, separating each sample with a delimiter.
 Training samplice not work
 
-### 4. Train on Wikipedia-ITA
+### 5. Train on Wikipedia-ITA
 Shakespeare is ~1MB. The model memorizes it quickly. `data/promessi_sposi.txt` is already included as an alternative. For something larger, Wikipedia-ITA dumps
 
-### 5. Add BPE tokenization
+### 6. Add BPE tokenization
 
-### 6. Subword tokenization
+### 7. Subword tokenization
 Character-level tokenization is simple but inefficient: each token carries little information, so the model needs a long context to understand meaning. Real language models (GPT, LLaMA) use BPE tokenizers that split text into subwords (e.g., "Shake" + "speare"). `tiktoken` is already in the dependencies — try replacing the character tokenizer with `tiktoken.get_encoding("gpt2")`.
 
-### 7. Experiment tracking
+### 8. Experiment tracking
 Saving losses to `loss_log.json` is a start. Plot them with matplotlib to see the learning curves. For bigger experiments, tools like [Weights & Biases](https://wandb.ai) or TensorBoard let you compare runs, visualize attention patterns, and track GPU utilization.
 
-### 8. Gradient norm monitoring
+### 9. Gradient norm monitoring
 The code already clips gradients (`clip_grad_norm_`). Also log the gradient norm before clipping — a suddenly large gradient norm often signals numerical instability or a bad batch.
 
 ```python
