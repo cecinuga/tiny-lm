@@ -60,8 +60,6 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
 
 ### 0. Add TrainConfig class in train.py and insert variable used by training
 
-### 1. Saving health_check must be done after each `max_step/10` epochs
-
 ### 2. Improove overfitting detection system
 The term `value` refers to a general term that is used to measure the performance of the model.
 Save the last `n` `value` in an array, initialized with only `neutral value`, each successive element for being part to the array it must be greater than the last `n` values.
