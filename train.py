@@ -1,4 +1,5 @@
-from utils import save_checkpoint
+from math import ceil
+from utils import save_checkpoint, model_arch, today
 from attr import s
 import argparse
 import json
@@ -57,16 +58,21 @@ def sampling(model: GPT, stoi, itos, step: int):
     tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
     model.train()
 
-@utils.static_vars(best_val_loss_log=[float('inf')], patience=0)
+@utils.static_vars(best_val_loss_log=[float('inf')], best_val_loss=float('inf'), patience=0)
 def health_check(model: GPT, config: GPTConfig, step:int, stoi, itos, val_loss: float) -> bool:
+    #print(val_loss, health_check.patience)
+    print(health_check.best_val_loss_log)
     if val_loss < health_check.best_val_loss_log[-1]:
+        health_check.patience = 0
+        health_check.best_val_loss = val_loss
         health_check.best_val_loss_log.append(val_loss)
         save_checkpoint(model, config, step, stoi, itos, "best")
     else:
-        health_check.patience++
+        health_check.patience += 1
 
-    if health_check.patience > len(health_check.best_val_loss_log)/2:
-        print("Overfitting detected, stopping early!!!")
+    if health_check.patience > ceil(len(health_check.best_val_loss_log)/2):
+        print(f"Overfitting detected, stopping early!!!")
+        print(f"actual_val_loss={val_loss}, best_val_loss={health_check.best_val_loss}, patience={health_check.patience}")
         return False
 
     return True
@@ -140,7 +146,8 @@ def train(
             loss_log["val"].append(val_loss)
             loss_log["perplexity"].append(perplexity)
 
-        sampling(model, stoi, itos, step)
+        if step > 0 and step % valuation_step == 0:
+            sampling(model, stoi, itos, step)
 
         if step > 0 and step % health_step == 0:
             health = health_check(model, config, step, stoi, itos, val_loss)
@@ -151,7 +158,7 @@ def train(
     if health is True:
         save_checkpoint(model, config, args.max_steps, stoi, itos, "final_checkpoint")
 
-    with open("loss_log.json", "w") as f:
+    with open(f"loss_logs/loss_log_{today}_{model_arch(config)}.json", "w") as f:
         json.dump(loss_log, f)
 
     return model, stoi, itos
@@ -161,7 +168,7 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
 
     parser = argparse.ArgumentParser(description="Train a GPT model")
-    parser.add_argument("--data", type=str, help="Path to dataset file (e.g. shakespeare.txt)")
+    parser.add_argument("--data", type=str, default="data/promessi_sposi.txt", help="Path to dataset file (e.g. shakespeare.txt)")
     parser.add_argument("--layer", type=int, default=6, help="Number of layers")
     parser.add_argument("--head", type=int, default=6, help="Number of heads")
     parser.add_argument("--embd",  type=int, default=384, help="Embedding dimension")
@@ -169,5 +176,9 @@ if __name__ == "__main__":
     parser.add_argument("--batch", type=int, default=64, help="Batch size")
     parser.add_argument("--max-steps", type=int, default=2500, help="Maximum number of training steps")
     args = parser.parse_args()
+
+    for _, (name, value) in enumerate(args.__dict__.items()):
+        print(f"{name} = {value}")
+    print("-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+")
 
     train(args, device=device)

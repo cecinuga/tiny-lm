@@ -18,7 +18,7 @@ def save_checkpoint(model: GPT, config: GPTConfig, step, stoi, itos, prefix="che
             "stoi": stoi,
             "itos": itos,
         },
-        f"checkpoints/{checkpoint_name(step, config, prefix=prefix)}.pt",
+        f"checkpoints/promessi_sposi/{checkpoint_name(step, config, prefix=prefix)}.pt",
     )
 
 def static_vars(**kwargs):
