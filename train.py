@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from train_utils import static_vars, load_data, save_checkpoint, model_arch, today, get_device, get_lr, TrainConfig
-from math import ceil
+from math import floor
 import argparse
 import json
 import time
@@ -11,6 +11,7 @@ import inference
 from model import GPT, GPTConfig
 
 def sampling(model: GPT, stoi, itos, step: int):
+    """Generate a short text sample from the model and print it to stdout via tqdm."""
     model.eval()
     sample = inference.generate(
         model, "Come stai ?", stoi, itos, max_new_tokens=100, temperature=0.8
@@ -21,9 +22,11 @@ def sampling(model: GPT, stoi, itos, step: int):
 @static_vars(best_val_loss=float('inf'), patience=1, patience_counter=0)
 def early_stop(val_loss: float) -> bool:
     """
-    returns True if the model is overfitting, False otherwise.
+    Track validation loss history and return True if overfitting is detected.
+
+    Overfitting is signaled when the number of consecutive non-improving evaluations
+    exceeds half the count of improvements seen so far.
     """
-    #print(val_loss, early_stop.patience)
     if val_loss < early_stop.best_val_loss:
         early_stop.patience = 0
         early_stop.patience_counter += 1
@@ -31,7 +34,7 @@ def early_stop(val_loss: float) -> bool:
     else:
         early_stop.patience += 1
 
-    if early_stop.patience > ceil(len(early_stop.patience_counter)/2):
+    if early_stop.patience > floor(len(early_stop.patience_counter)/2):
         print(f"Overfitting detected, stopping early!!!")
         print(f"actual_val_loss={val_loss}, best_val_loss={early_stop.best_val_loss}, patience={early_stop.patience}")
         return True
@@ -43,6 +46,13 @@ def train(
     train_config: TrainConfig,
     device=None
 ):
+    """
+    Run the full training loop: load data, build model, optimize, evaluate, and checkpoint.
+
+    Evaluates every max_steps/10 steps; saves the best checkpoint after each evaluation
+    and a final checkpoint at the end. Stops early if overfitting is detected.
+    Returns the trained model along with stoi and itos vocabulary mappings.
+    """
     get_train_batch, get_val_batch, vocab_size, stoi, itos = load_data(train_config, device)
 
     model_config = GPTConfig(
@@ -93,10 +103,10 @@ def train(
         _, loss = model(x, y)
         optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
-        pbar.set_postfix(perplexity=f"{perplexity}", loss=f"{loss.item():.4f}", lr=f"{lr:.2e}")
+        pbar.set_postfix(gnorm=f"{grad_norm:.2f}", perplexity=f"{perplexity:.1f}", loss=f"{loss.item():.4f}", lr=f"{lr:.2e}")
 
         loss_log["steps"].append(step)
         loss_log["train"].append(loss.item())

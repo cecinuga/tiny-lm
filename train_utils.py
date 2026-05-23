@@ -7,6 +7,7 @@ today = time.strftime("%Y%m%d")
 
 @dataclass
 class TrainConfig:
+    """Hyperparameters and I/O paths for a single training run."""
     n_layer: int = 6
     n_head: int = 6
     n_embd: int = 384
@@ -17,12 +18,15 @@ class TrainConfig:
     out_checkpoint: str = "checkpoints/"
 
 def model_arch(config: GPTConfig):
+    """Return a compact architecture string, e.g. 'L6H6E384'."""
     return f"L{config.n_layer}H{config.n_head}E{config.n_embd}"
 
 def checkpoint_name(step, config:GPTConfig, date=today, prefix="final"):
+    """Build a checkpoint filename from prefix, date, architecture string, and step number."""
     return f"{prefix}_{date}_{model_arch(config)}_{step}"
 
 def save_checkpoint(model: GPT, config: GPTConfig, step, stoi, itos, output_dir:str="checkpoints", prefix="checkpoint"):
+    """Serialize model weights, config, and char vocabulary to a .pt file under artifacts/checkpoints/."""
     torch.save(
         {
             "step": step,
@@ -35,6 +39,7 @@ def save_checkpoint(model: GPT, config: GPTConfig, step, stoi, itos, output_dir:
     )
 
 def get_device():
+    """Return the best available device: MPS (Apple Silicon), CUDA, or CPU."""
     if torch.backends.mps.is_available():
         return torch.device("mps")
     elif torch.cuda.is_available():
@@ -42,12 +47,14 @@ def get_device():
     return torch.device("cpu")
 
 def get_batch(block_size, batch_size, split_tokens, device=None):
+    """Sample a random batch of (input, target) token sequences from a flat token tensor."""
     ix = torch.randint(len(split_tokens) - block_size - 1, (batch_size,))
     x = torch.stack([split_tokens[i : i + block_size] for i in ix]).to(device)
     y = torch.stack([split_tokens[i + 1 : i + block_size + 1] for i in ix]).to(device)
     return x, y
 
 def get_lr(step, warmup_steps, max_steps, max_lr, min_lr):
+    """Compute the learning rate for the current step using linear warmup followed by cosine decay."""
     if step < warmup_steps:
         return max_lr * (step + 1) / warmup_steps
     if step >= max_steps:
@@ -57,6 +64,12 @@ def get_lr(step, warmup_steps, max_steps, max_lr, min_lr):
     return min_lr + 0.5 * (max_lr - min_lr) * (1 + math.cos(math.pi * progress))
 
 def load_data(config: TrainConfig, device):
+    """
+    Load a text file, build a character-level vocabulary, and tokenize the corpus.
+
+    Returns train/val batch samplers, vocab size, and char↔index mappings (stoi, itos).
+    The split is 90% train / 10% val.
+    """
     with open(config.data, "r", encoding="latin-1") as f:
         text = f.read()
 
@@ -74,6 +87,7 @@ def load_data(config: TrainConfig, device):
     return get_train, get_val, vocab_size, stoi, itos
 
 def static_vars(**kwargs):
+    """Decorator that attaches keyword arguments as persistent attributes on the decorated function."""
     def decorate(func):
         for k in kwargs:
             setattr(func, k, kwargs[k])

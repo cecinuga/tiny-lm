@@ -13,6 +13,7 @@ checkpoints/
 artifacts/
 test.py
 test_train.sh
+loss_plot.py
 
 # Distribution / packaging
 .Python

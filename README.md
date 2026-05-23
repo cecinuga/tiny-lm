@@ -1,10 +1,10 @@
 # tiny-lm
 
-A tiny GPT-style language model trained from scratch on Shakespeare, runnable on a laptop.
+A tiny GPT-style language model trained from scratch on any text file, runnable on a laptop.
 
 ## What this is
 
-tiny-lm implements a character-level GPT with ~11.5M parameters. It learns to generate Shakespeare-like text by predicting the next character one step at a time. The architecture follows the original transformer paper: multi-head causal self-attention + feed-forward blocks with residual connections and layer normalization.
+tiny-lm implements a character-level GPT with ~11.5M parameters. It learns to generate text in the style of the training corpus by predicting the next character one step at a time. The architecture follows the original transformer paper: multi-head causal self-attention + feed-forward blocks with residual connections and layer normalization.
 
 ## Installation
 
@@ -30,11 +30,17 @@ python train.py [options]
 | `--max-steps` | 2500 | Training steps |
 | `--out-checkpoint` | `checkpoints/` | Checkpoint output directory |
 
-Checkpoints are saved at regular intervals during training.
+Checkpoints are saved at regular intervals during training under `artifacts/checkpoints/`.
+
+**Plot learning curves:**
+```bash
+python loss_plot.py
+```
+Displays train loss (raw + smoothed), val loss, and perplexity from a `loss_log.json` file. Edit `LOG_PATH` at the top of the file to point to a different run. Requires `matplotlib` (`uv add matplotlib`).
 
 **Generate text from a checkpoint:**
 ```bash
-python inference.py --checkpoint checkpoints/<your_checkpoint>.pt --prompt "To be or not"
+python inference.py --checkpoint artifacts/checkpoints/<your_checkpoint>.pt --prompt "To be or not"
 ```
 
 Options:
@@ -69,21 +75,20 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
 
 ## Improvement Ideas
 
-### 1. Improve saving checkpoint: check duplicate file name
-### 2. Improve saving loss_log: check duplicate file name
-
-### 3. Add disable checkpoint saving flag
-### 4. Add disable mid-checkpoint saving flag
+### 0. Improved artifacts handling
+0. artifacts folder structure must be refactored: artifacts/`today`
+  1. every sub folder of artifacts must be in artifacts/`today`
+  2. every artifact name must be unique
+  3. every artifact name must not contain any date
+1. Create ArtifactsConfig and adapt train loop
+2. Check for duplicate file names before saving checkpoints and loss logs 
+3. Save inference sampling in a text file during training
+4. Add disable checkpoint saving flag
+5. Add disable mid-checkpoint saving flag
+6. Add disable loss logging flag
 
 ### 6. Add error handling in train.py
 
-### 7. Improove overfitting detection system
-The term `value` refers to a general term that is used to measure the performance of the model.
-Save the last `n` `value` in an array, initialized with only `neutral value`, each successive element for being part to the array it must be greater than the last `n` values.
-To detect overfitting the actual `value` must fail the aforementioned control `m` times in a row, `m` is computed as `n / 2`.
-- 2.1 `value` = actual best_val_loss; `neutral value` = `float('inf')`
-- 2.2 `value` = gap between actual best_val_loss and train_loss; `neutral value` = `0`: the control is inverted, if to much value is appended to array the overfitting will be detected
- 
 ### 8. Saving inference sampling in a text file during training 
 I wanna save sampling inference in a unique text file, separating each sample with a delimiter.
 Training samplice not work
@@ -95,15 +100,7 @@ Shakespeare is ~1MB. The model memorizes it quickly. `data/promessi_sposi.txt` i
 Character-level tokenization is simple but inefficient: each token carries little information, so the model needs a long context to understand meaning. Real language models (GPT, LLaMA) use BPE tokenizers that split text into subwords (e.g., "Shake" + "speare"). `tiktoken` is already in the dependencies — try replacing the character tokenizer with `tiktoken.get_encoding("gpt2")`.
 
 ### 12. Experiment tracking
-Saving losses to `loss_log.json` is a start. Plot them with matplotlib to see the learning curves. For bigger experiments, tools like [Weights & Biases](https://wandb.ai) or TensorBoard let you compare runs, visualize attention patterns, and track GPU utilization.
-
-### 13. Gradient norm monitoring
-The code already clips gradients (`clip_grad_norm_`). Also log the gradient norm before clipping — a suddenly large gradient norm often signals numerical instability or a bad batch.
-
-```python
-grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-pbar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{lr:.2e}", gnorm=f"{grad_norm:.2f}")
-```
+Loss curves are already plotted by `loss_plot.py`. For bigger experiments, tools like [Weights & Biases](https://wandb.ai) or TensorBoard let you compare runs, visualize attention patterns, and track GPU utilization.
 
 ### 14. Add streaming in inference
 Stream the output tokens one by one rather than waiting for the model to generate all at once.

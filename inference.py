@@ -3,6 +3,12 @@ from model import GPT, GPTConfig
 
 @torch.no_grad()
 def generate(model:GPT, prompt, stoi, itos, max_new_tokens=200, temperature=0.8, top_k=40):
+    """
+    Autoregressively generate text from a prompt using top-k sampling with temperature.
+
+    Characters in the prompt not present in the vocabulary are silently skipped.
+    Returns the full string (prompt + generated tokens).
+    """
     device = next(model.parameters()).device
 
     tokens = [stoi[c] for c in prompt if c in stoi]
@@ -42,6 +48,7 @@ if __name__ == "__main__":
 
     torch.serialization.add_safe_globals([GPTConfig])
     checkpoint = torch.load(args.checkpoint, weights_only=True)
+
     config = checkpoint["config"]
     stoi = checkpoint["stoi"]
     itos = checkpoint["itos"]

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 @dataclass
 class GPTConfig:
+    """Hyperparameters that fully describe a GPT model's architecture."""
     n_head:     int   # number of attention heads
     n_embd:     int   # embedding dimension
     n_layer:    int   # number of transformer blocks
@@ -11,6 +12,8 @@ class GPTConfig:
     block_size: int   # max sequence length (context window)
 
 class CausalSelfAttention(nn.Module):
+    """Multi-head causal self-attention with a single fused QKV projection."""
+
     def __init__(self, config:GPTConfig):
         super().__init__()
         assert config.n_embd % config.n_head == 0
@@ -20,6 +23,7 @@ class CausalSelfAttention(nn.Module):
         self.n_embd = config.n_embd
 
     def forward(self, x):
+        """Project input to Q/K/V, apply scaled dot-product attention with causal mask, return output projection."""
         B, T, C = x.shape
         qkv = self.c_attn(x)
         q, k, v = qkv.split(self.n_embd, dim=2)
@@ -39,6 +43,8 @@ class CausalSelfAttention(nn.Module):
         return self.c_proj(y)
 
 class MLP(nn.Module):
+    """Position-wise feed-forward network: linear up-projection → GELU → linear down-projection."""
+
     def __init__(self, config:GPTConfig):
         super().__init__()
         self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd)
@@ -46,11 +52,14 @@ class MLP(nn.Module):
         self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
 
     def forward(self, x):
+        """Apply up-projection, GELU activation, and down-projection."""
         x = self.c_fc(x) # project up: 384 -> 1536
         x = self.gelu(x) # non-linearity
         return self.c_proj(x) # project back down: 1536 -> 384
 
 class Block(nn.Module):
+    """Transformer block: pre-norm causal self-attention and pre-norm MLP, each with a residual connection."""
+
     def __init__(self, config:GPTConfig):
         super().__init__()
         self.ln_1 = nn.LayerNorm(config.n_embd)
@@ -59,11 +68,14 @@ class Block(nn.Module):
         self.mlp  = MLP(config)
 
     def forward(self, x):
+        """Apply LayerNorm → attention → residual, then LayerNorm → MLP → residual."""
         x = x + self.attn(self.ln_1(x)) # attention with residual connection
         x = x + self.mlp(self.ln_2(x))  # MLP with residual connection
         return x
 
 class GPT(nn.Module):
+    """Character-level GPT with token and positional embeddings, transformer blocks, and a weight-tied output head."""
+
     def __init__(self, config: GPTConfig):
         super().__init__()
         self.config = config
@@ -77,6 +89,7 @@ class GPT(nn.Module):
         self.transformer.wte.weight = self.lm_head.weight
 
     def forward(self, idx, targets=None):
+        """Run the full forward pass; return (logits, loss) where loss is cross-entropy if targets are provided."""
         B, T = idx.shape
         pos = torch.arange(0, T, device=idx.device)
 
