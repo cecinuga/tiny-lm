@@ -37,21 +37,21 @@ Artifact output is controlled separately:
 | `-o-art`, `--out-artifact` | `artifacts/` | Root artifact directory |
 | `-o-chk`, `--out-checkpoint` | `checkpoints/` | Checkpoint subfolder (under artifact root) |
 | `-o-l`, `--out-loss-log` | `loss_logs/` | Loss log subfolder |
-| `-o-s`, `--out-sampling` | `sampling/` | Sampling subfolder |
+| `-o-s`, `--out-sample` | `samples/` | Sample subfolder |
 | `-no-a`, `--no-artifact` | — | Disable all artifact saving |
 | `-no-c`, `--no-checkpoint` | — | Disable checkpoint saving |
 | `-no-ll`, `--no-loss-log` | — | Disable loss log saving |
-| `-no-s`, `--no-sampling` | — | Disable sampling saving |
+| `-no-s`, `--no-sample` | — | Disable sample saving |
 
 **Plot learning curves:**
 ```bash
 python loss_plot.py
 ```
-Displays train loss (raw + smoothed), val loss, and perplexity from a `loss_log.json` file. Edit `LOG_PATH` at the top of the file to point to a different run. Requires `matplotlib` (`uv add matplotlib`).
+Displays train loss (raw + smoothed), val loss, and perplexity from a `loss_log.json` file. Edit `LOG_PATH` at the top of the file to point to a different run.
 
 **Generate text from a checkpoint:**
 ```bash
-python inference.py --checkpoint artifacts/checkpoints/<your_checkpoint>.pt --prompt "To be or not"
+python inference.py --checkpoint artifacts/<YYYYMMDD>/checkpoints/<your_checkpoint>.pt --prompt "To be or not"
 ```
 
 Options:
@@ -87,23 +87,16 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
 ## Improvement Ideas
 
 ### 0. Improved artifacts handling
-0. artifacts folder structure must be refactored: artifacts/`today`
-  1. every sub folder of artifacts must be in artifacts/`today`
-  2. every artifact name must be unique
-  3. every artifact name must not contain any date
+0. every artifact name must be unique (loss logs and samples currently overwrite across runs in the same day)
+1. every artifact name must not contain any date
 2. Check for duplicate file names before saving checkpoints and loss logs 
-3. Save inference sampling in a text file during training
-5. Implement disable mid-checkpoint saving flag
-
-### 8. Saving inference sampling in a text file during training 
-I wanna save sampling inference in a unique text file, separating each sample with a delimiter.
-Training samplice not work
+3. Check if paths have trailing slashes and add them if missing
 
 ### 9. Train on Wikipedia-ITA
 Shakespeare is ~1MB. The model memorizes it quickly. `data/promessi_sposi.txt` is already included as an alternative. For something larger, Wikipedia-ITA dumps
 
 ### 10. Add BPE tokenization
-Character-level tokenization is simple but inefficient: each token carries little information, so the model needs a long context to understand meaning. Real language models (GPT, LLaMA) use BPE tokenizers that split text into subwords (e.g., "Shake" + "speare"). `tiktoken` is already in the dependencies — try replacing the character tokenizer with `tiktoken.get_encoding("gpt2")`.
+Character-level tokenization is simple but inefficient: each token carries little information, so the model needs a long context to understand meaning. Real language models (GPT, LLaMA) use BPE tokenizers that split text into subwords (e.g., "Shake" + "speare"). Add `tiktoken` (`uv add tiktoken`) and try replacing the character tokenizer with `tiktoken.get_encoding("gpt2")`.
 
 ### 12. Experiment tracking
 Loss curves are already plotted by `loss_plot.py`. For bigger experiments, tools like [Weights & Biases](https://wandb.ai) or TensorBoard let you compare runs, visualize attention patterns, and track GPU utilization.
