@@ -1,5 +1,8 @@
+from six import b
+from matplotlib.rcsetup import validate_any
 from dataclasses import dataclass
-from train_utils import static_vars, load_data, save_checkpoint, model_arch, today, get_device, get_lr, TrainConfig, validate_train_config
+from train_utils import static_vars, load_data, save_checkpoint, model_arch, today, get_device, get_lr, validate_train_config, validate_artifact_config
+from train_types import TrainConfig, ArtifactConfig
 from math import floor
 import argparse
 import json
@@ -34,7 +37,7 @@ def early_stop(val_loss: float) -> bool:
     else:
         early_stop.patience += 1
 
-    if early_stop.patience > floor(len(early_stop.patience_counter)/2):
+    if early_stop.patience > floor(early_stop.patience_counter/2):
         print(f"Overfitting detected, stopping early!!!")
         print(f"actual_val_loss={val_loss}, best_val_loss={early_stop.best_val_loss}, patience={early_stop.patience}")
         return True
@@ -44,6 +47,7 @@ def early_stop(val_loss: float) -> bool:
 
 def train(
     train_config: TrainConfig,
+    artifact_config: ArtifactConfig,
     device=None
 ):
     """
@@ -120,13 +124,13 @@ def train(
         if step > 0 and step % valuation_step == 0:
             early_stopped = early_stop(val_loss)
             if early_stopped is False:
-                save_checkpoint(model, model_config, step, stoi, itos, train_config.out_checkpoint, "best")
+                save_checkpoint(model, model_config, step, stoi, itos, artifact_config.out_checkpoint, "best")
 
         if early_stopped is True:
             break
 
     if early_stopped is False:
-        save_checkpoint(model, model_config, train_config.max_steps, stoi, itos, train_config.out_checkpoint, "final_checkpoint")
+        save_checkpoint(model, model_config, train_config.max_steps, stoi, itos, artifact_config.out_checkpoint, "final_checkpoint")
 
     with open(f"artifacts/loss_logs/loss_log_{today}_{model_arch(model_config)}.json", "w") as f:
         json.dump(loss_log, f)
@@ -137,31 +141,55 @@ if __name__ == "__main__":
     device = get_device()
     print(f"Using device: {device}")
 
-    parser = argparse.ArgumentParser(description="Train a GPT model")
-    parser.add_argument("-d", "--data", type=str, default="data/promessi_sposi.txt", help="Path to dataset file (e.g. shakespeare.txt)")
-    parser.add_argument("-l", "--layer", type=int, default=6, help="Number of layers")
-    parser.add_argument("-H", "--head", type=int, default=6, help="Number of heads")
-    parser.add_argument("-e", "--embd", type=int, default=384, help="Embedding dimension")
-    parser.add_argument("-b", "--block-size", type=int, default=256, help="Block size")
-    parser.add_argument("-B", "--batch-size", type=int, default=64, help="Batch size")
-    parser.add_argument("--max-steps", type=int, default=2500, help="Maximum number of training steps")
-    parser.add_argument("-o-chk", "--out-checkpoint", type=str, default="checkpoints/", help="Path to checkpoint file")
-    args = parser.parse_args()
+    train_parser = argparse.ArgumentParser(description="Train a GPT model")
+    train_parser.add_argument("-d", "--data", type=str, default="data/promessi_sposi.txt", help="Path to dataset file (e.g. shakespeare.txt)")
+    train_parser.add_argument("-l", "--layer", type=int, default=6, help="Number of layers")
+    train_parser.add_argument("-H", "--head", type=int, default=6, help="Number of heads")
+    train_parser.add_argument("-e", "--embd", type=int, default=384, help="Embedding dimension")
+    train_parser.add_argument("-b", "--block-size", type=int, default=256, help="Block size")
+    train_parser.add_argument("-B", "--batch-size", type=int, default=64, help="Batch size")
+    train_parser.add_argument("--max-steps", type=int, default=2500, help="Maximum number of training steps")
+    train_parser.add_argument("-n-save", "--n-save-interval", type=int, default=10, help="Number of time program saves an artifact (shared between all artifacts)")
+    train_parser.add_argument("-o-art", "--out-artifact", type=str, default="artifacts/", help="Root artifact folder")
+    train_parser.add_argument("-o-chk", "--out-checkpoint", type=str, default="checkpoints/", help="checkpoint folder, is prefixed to artifacts folder")
+    train_parser.add_argument("-o-l", "--out-loss-log", type=str, default="loss_logs/", help="loss log folder, is prefixed to artifacts folder")
+    train_parser.add_argument("-o-s", "--out-sampling", type=str, default="sampling/", help="sampling folder, is prefixed to artifacts folder")
+    train_parser.add_argument("-no-a", "--no-artifact", action="store_true", help="Disable artifact saving")
+    train_parser.add_argument("-no-c", "--no-checkpoint", action="store_true", help="Disable checkpoint saving")
+    train_parser.add_argument("-no-ll", "--no-loss-log", action="store_true", help="Disable loss log saving")
+    train_parser.add_argument("-no-s", "--no-sampling", action="store_true", help="Disable sampling saving")
+    train_args = train_parser.parse_args()
 
     train_config = TrainConfig(
-        data=args.data,
-        n_layer=args.layer,
-        n_head=args.head,
-        n_embd=args.embd,
-        block_size=args.block_size,
-        batch_size=args.batch_size,
-        max_steps=args.max_steps,
-        out_checkpoint=args.out_checkpoint,
+        data=train_args.data,
+        n_layer=train_args.layer,
+        n_head=train_args.head,
+        n_embd=train_args.embd,
+        block_size=train_args.block_size,
+        batch_size=train_args.batch_size,
+        max_steps=train_args.max_steps,
     )
     validate_train_config(train_config)
+
+    artifact_config = ArtifactConfig(
+        out_artifact=train_args.out_artifact,
+        out_checkpoint=train_args.out_checkpoint,
+        out_loss_log=train_args.out_loss_log,
+        out_sampling=train_args.out_sampling,
+        n_save_interval=train_args.n_save_interval,
+        no_artifact=train_args.no_artifact,
+        no_checkpoint=train_args.no_checkpoint,
+        no_loss_log=train_args.no_loss_log,
+        no_sampling=train_args.no_sampling,
+    )
+    validate_artifact_config(artifact_config)
 
     for _, (name, value) in enumerate(train_config.__dict__.items()):
         print(f"{name} = {value}")
     print("-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+")
 
-    train(train_config, device=device)
+    for _, (name, value) in enumerate(artifact_config.__dict__.items()):
+        print(f"{name} = {value}")
+    print("-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+")
+
+    train(train_config, artifact_config, device=device)

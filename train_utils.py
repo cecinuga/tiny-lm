@@ -1,21 +1,10 @@
-from dataclasses import dataclass
+from train_types import TrainConfig, ArtifactConfig, default_artifact, default_checkpoint, default_loss_log, default_sampling
 import math
 import torch
 import time
 from model import GPTConfig, GPT
-today = time.strftime("%Y%m%d")
 
-@dataclass
-class TrainConfig:
-    """Hyperparameters and I/O paths for a single training run."""
-    n_layer: int = 6
-    n_head: int = 6
-    n_embd: int = 384
-    block_size: int = 256
-    batch_size: int = 64
-    max_steps: int = 2500
-    data: str = "data/promessi_sposi.txt"
-    out_checkpoint: str = "checkpoints/"
+today = time.strftime("%Y%m%d")
 
 def static_vars(**kwargs):
     """Decorator that attaches keyword arguments as persistent attributes on the decorated function."""
@@ -44,6 +33,15 @@ def validate_train_config(config: TrainConfig):
     if config.n_embd % config.batch_size != 0:
         raise ValueError("n_embd must be divisible by batch_size")
 
+def validate_artifact_config(artifact_config: ArtifactConfig):
+    if artifact_config.no_artifact and artifact_config.out_artifact != default_artifact:
+        raise ValueError("out_artifact must be specified when artifact is enabled")
+    if (artifact_config.no_checkpoint or artifact_config.no_artifact) and artifact_config.out_checkpoint != default_checkpoint:
+        raise ValueError("out_checkpoint must be specified when checkpoint is enabled (and artifact is enabled)")
+    if (artifact_config.no_loss_log or artifact_config.no_artifact) and artifact_config.out_loss_log != default_loss_log:
+        raise ValueError("out_loss_log must be specified when loss log is enabled (and artifact is enabled)")
+    if (artifact_config.no_sampling or artifact_config.no_artifact) and artifact_config.out_sampling != default_sampling:
+        raise ValueError("out_sampling must be specified when sampling is enabled (and artifact is enabled)")
 
 def model_arch(config: GPTConfig):
     """Return a compact architecture string, e.g. 'L6H6E384'."""
