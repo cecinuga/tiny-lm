@@ -22,15 +22,26 @@ python train.py [options]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-d`, `--data` | `data/promessi_sposi.txt` | Path to training dataset |
-| `-l`, `--n-layer` | 6 | Number of transformer layers |
-| `-H`, `--n-head` | 6 | Number of attention heads |
-| `-e`, `--n-embd` | 384 | Embedding dimension |
+| `-l`, `--layer` | 6 | Number of transformer layers |
+| `-H`, `--head` | 6 | Number of attention heads |
+| `-e`, `--embd` | 384 | Embedding dimension |
 | `-b`, `--block-size` | 256 | Context window size |
 | `-B`, `--batch-size` | 64 | Batch size |
 | `--max-steps` | 2500 | Training steps |
-| `--out-checkpoint` | `checkpoints/` | Checkpoint output directory |
 
-Checkpoints are saved at regular intervals during training under `artifacts/checkpoints/`.
+Artifact output is controlled separately:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-n-save`, `--n-save-interval` | 10 | How many times artifacts are saved during training |
+| `-o-art`, `--out-artifact` | `artifacts/` | Root artifact directory |
+| `-o-chk`, `--out-checkpoint` | `checkpoints/` | Checkpoint subfolder (under artifact root) |
+| `-o-l`, `--out-loss-log` | `loss_logs/` | Loss log subfolder |
+| `-o-s`, `--out-sampling` | `sampling/` | Sampling subfolder |
+| `-no-a`, `--no-artifact` | — | Disable all artifact saving |
+| `-no-c`, `--no-checkpoint` | — | Disable checkpoint saving |
+| `-no-ll`, `--no-loss-log` | — | Disable loss log saving |
+| `-no-s`, `--no-sampling` | — | Disable sampling saving |
 
 **Plot learning curves:**
 ```bash
@@ -80,12 +91,9 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
   1. every sub folder of artifacts must be in artifacts/`today`
   2. every artifact name must be unique
   3. every artifact name must not contain any date
-1. Create ArtifactsConfig and adapt train loop
 2. Check for duplicate file names before saving checkpoints and loss logs 
 3. Save inference sampling in a text file during training
-4. Add disable checkpoint saving flag
-5. Add disable mid-checkpoint saving flag
-6. Add disable loss logging flag
+5. Implement disable mid-checkpoint saving flag
 
 ### 8. Saving inference sampling in a text file during training 
 I wanna save sampling inference in a unique text file, separating each sample with a delimiter.
