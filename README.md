@@ -87,8 +87,6 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
 5. Add disable mid-checkpoint saving flag
 6. Add disable loss logging flag
 
-### 6. Add error handling in train.py
-
 ### 8. Saving inference sampling in a text file during training 
 I wanna save sampling inference in a unique text file, separating each sample with a delimiter.
 Training samplice not work

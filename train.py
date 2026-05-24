@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from train_utils import static_vars, load_data, save_checkpoint, model_arch, today, get_device, get_lr, TrainConfig
+from train_utils import static_vars, load_data, save_checkpoint, model_arch, today, get_device, get_lr, TrainConfig, validate_train_config
 from math import floor
 import argparse
 import json
@@ -158,6 +158,7 @@ if __name__ == "__main__":
         max_steps=args.max_steps,
         out_checkpoint=args.out_checkpoint,
     )
+    validate_train_config(train_config)
 
     for _, (name, value) in enumerate(train_config.__dict__.items()):
         print(f"{name} = {value}")

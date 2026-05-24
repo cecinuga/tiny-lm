@@ -17,6 +17,34 @@ class TrainConfig:
     data: str = "data/promessi_sposi.txt"
     out_checkpoint: str = "checkpoints/"
 
+def static_vars(**kwargs):
+    """Decorator that attaches keyword arguments as persistent attributes on the decorated function."""
+    def decorate(func):
+        for k in kwargs:
+            setattr(func, k, kwargs[k])
+        return func
+    return decorate
+
+def validate_train_config(config: TrainConfig):
+    """Raise a ValueError if the config is invalid."""
+    if config.n_layer <= 0:
+        raise ValueError("n_layer must be a positive integer")
+    if config.n_head <= 0:
+        raise ValueError("n_head must be a positive integer")
+    if config.n_embd <= 0:
+        raise ValueError("n_embd must be a positive integer")
+    if config.block_size <= 0:
+        raise ValueError("block_size must be a positive integer")
+    if config.batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+    if config.max_steps <= 0:
+        raise ValueError("max_steps must be a positive integer")
+    if config.n_embd % config.n_head != 0:
+        raise ValueError("n_embd must be divisible by n_head")
+    if config.n_embd % config.batch_size != 0:
+        raise ValueError("n_embd must be divisible by batch_size")
+
+
 def model_arch(config: GPTConfig):
     """Return a compact architecture string, e.g. 'L6H6E384'."""
     return f"L{config.n_layer}H{config.n_head}E{config.n_embd}"
@@ -85,11 +113,3 @@ def load_data(config: TrainConfig, device):
     get_train = lambda: get_batch(config.block_size, config.batch_size, tokens[:n], device)
     get_val = lambda: get_batch(config.block_size, config.batch_size, tokens[n:], device)
     return get_train, get_val, vocab_size, stoi, itos
-
-def static_vars(**kwargs):
-    """Decorator that attaches keyword arguments as persistent attributes on the decorated function."""
-    def decorate(func):
-        for k in kwargs:
-            setattr(func, k, kwargs[k])
-        return func
-    return decorate
