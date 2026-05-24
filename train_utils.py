@@ -1,10 +1,9 @@
-from train_types import TrainConfig, ArtifactConfig, default_artifact, default_checkpoint, default_loss_log, default_sampling
+from train_types import TrainConfig
+from artifact_utils import ArtifactConfig
 import math
 import torch
 import time
 from model import GPTConfig, GPT
-
-today = time.strftime("%Y%m%d")
 
 def static_vars(**kwargs):
     """Decorator that attaches keyword arguments as persistent attributes on the decorated function."""
@@ -32,37 +31,6 @@ def validate_train_config(config: TrainConfig):
         raise ValueError("n_embd must be divisible by n_head")
     if config.n_embd % config.batch_size != 0:
         raise ValueError("n_embd must be divisible by batch_size")
-
-def validate_artifact_config(artifact_config: ArtifactConfig):
-    if artifact_config.no_artifact and artifact_config.out_artifact != default_artifact:
-        raise ValueError("out_artifact must be specified when artifact is enabled")
-    if (artifact_config.no_checkpoint or artifact_config.no_artifact) and artifact_config.out_checkpoint != default_checkpoint:
-        raise ValueError("out_checkpoint must be specified when checkpoint is enabled (and artifact is enabled)")
-    if (artifact_config.no_loss_log or artifact_config.no_artifact) and artifact_config.out_loss_log != default_loss_log:
-        raise ValueError("out_loss_log must be specified when loss log is enabled (and artifact is enabled)")
-    if (artifact_config.no_sampling or artifact_config.no_artifact) and artifact_config.out_sampling != default_sampling:
-        raise ValueError("out_sampling must be specified when sampling is enabled (and artifact is enabled)")
-
-def model_arch(config: GPTConfig):
-    """Return a compact architecture string, e.g. 'L6H6E384'."""
-    return f"L{config.n_layer}H{config.n_head}E{config.n_embd}"
-
-def checkpoint_name(step, config:GPTConfig, date=today, prefix="final"):
-    """Build a checkpoint filename from prefix, date, architecture string, and step number."""
-    return f"{prefix}_{date}_{model_arch(config)}_{step}"
-
-def save_checkpoint(model: GPT, config: GPTConfig, step, stoi, itos, output_dir:str="checkpoints", prefix="checkpoint"):
-    """Serialize model weights, config, and char vocabulary to a .pt file under artifacts/checkpoints/."""
-    torch.save(
-        {
-            "step": step,
-            "model_state_dict": model.state_dict(),
-            "config": config,
-            "stoi": stoi,
-            "itos": itos,
-        },
-        f"artifacts/checkpoints/{output_dir}/{checkpoint_name(step, config, prefix=prefix)}.pt",
-    )
 
 def get_device():
     """Return the best available device: MPS (Apple Silicon), CUDA, or CPU."""

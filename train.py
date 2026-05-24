@@ -1,26 +1,16 @@
-from six import b
-from matplotlib.rcsetup import validate_any
+from tqdm import tqdm
 from dataclasses import dataclass
-from train_utils import static_vars, load_data, save_checkpoint, model_arch, today, get_device, get_lr, validate_train_config, validate_artifact_config
-from train_types import TrainConfig, ArtifactConfig
+from train_utils import static_vars, load_data, validate_train_config, get_device, get_lr
+from artifact_utils import save_checkpoint, validate_artifact_config, save_sample, today, model_arch, ArtifactConfig, default_checkpoint, default_loss_log, default_artifact, default_sample, save_loss_log
+from train_types import TrainConfig
 from math import floor
 import argparse
 import json
 import time
 import torch
 import math
-from tqdm import tqdm
 import inference
 from model import GPT, GPTConfig
-
-def sampling(model: GPT, stoi, itos, step: int):
-    """Generate a short text sample from the model and print it to stdout via tqdm."""
-    model.eval()
-    sample = inference.generate(
-        model, "Come stai ?", stoi, itos, max_new_tokens=100, temperature=0.8
-    )
-    tqdm.write(f"\n--- Step {step} sample ---\n{sample}\n---\n")
-    model.train()
 
 @static_vars(best_val_loss=float('inf'), patience=1, patience_counter=0)
 def early_stop(val_loss: float) -> bool:
@@ -119,21 +109,21 @@ def train(
             loss_log["perplexity"].append(perplexity)
 
         if step > 0 and step % valuation_step == 0:
-            sampling(model, stoi, itos, step)
+            save_sample(model, model_config, artifact_config, stoi=stoi, itos=itos, step=step)
 
         if step > 0 and step % valuation_step == 0:
             early_stopped = early_stop(val_loss)
             if early_stopped is False:
-                save_checkpoint(model, model_config, step, stoi, itos, artifact_config.out_checkpoint, "best")
+                save_checkpoint(model, model_config, artifact_config, step=step, stoi=stoi, itos=itos, prefix="best")
 
         if early_stopped is True:
             break
 
+    # Save final checkpoint only if model has not overfitted
     if early_stopped is False:
-        save_checkpoint(model, model_config, train_config.max_steps, stoi, itos, artifact_config.out_checkpoint, "final_checkpoint")
+        save_checkpoint(model, model_config, artifact_config, step=train_config.max_steps, stoi=stoi, itos=itos, prefix="final")
 
-    with open(f"artifacts/loss_logs/loss_log_{today}_{model_arch(model_config)}.json", "w") as f:
-        json.dump(loss_log, f)
+    save_loss_log(model_config, artifact_config, loss_log)
 
     return model, stoi, itos
 
@@ -150,14 +140,14 @@ if __name__ == "__main__":
     train_parser.add_argument("-B", "--batch-size", type=int, default=64, help="Batch size")
     train_parser.add_argument("--max-steps", type=int, default=2500, help="Maximum number of training steps")
     train_parser.add_argument("-n-save", "--n-save-interval", type=int, default=10, help="Number of time program saves an artifact (shared between all artifacts)")
-    train_parser.add_argument("-o-art", "--out-artifact", type=str, default="artifacts/", help="Root artifact folder")
-    train_parser.add_argument("-o-chk", "--out-checkpoint", type=str, default="checkpoints/", help="checkpoint folder, is prefixed to artifacts folder")
-    train_parser.add_argument("-o-l", "--out-loss-log", type=str, default="loss_logs/", help="loss log folder, is prefixed to artifacts folder")
-    train_parser.add_argument("-o-s", "--out-sampling", type=str, default="sampling/", help="sampling folder, is prefixed to artifacts folder")
+    train_parser.add_argument("-o-art", "--out-artifact", type=str, default=default_artifact, help="Root artifact folder")
+    train_parser.add_argument("-o-chk", "--out-checkpoint", type=str, default=default_checkpoint, help="checkpoint folder, is prefixed to artifacts folder")
+    train_parser.add_argument("-o-l", "--out-loss-log", type=str, default=default_loss_log, help="loss log folder, is prefixed to artifacts folder")
+    train_parser.add_argument("-o-s", "--out-sample", type=str, default=default_sample, help="sampling folder, is prefixed to artifacts folder")
     train_parser.add_argument("-no-a", "--no-artifact", action="store_true", help="Disable artifact saving")
     train_parser.add_argument("-no-c", "--no-checkpoint", action="store_true", help="Disable checkpoint saving")
     train_parser.add_argument("-no-ll", "--no-loss-log", action="store_true", help="Disable loss log saving")
-    train_parser.add_argument("-no-s", "--no-sampling", action="store_true", help="Disable sampling saving")
+    train_parser.add_argument("-no-s", "--no-sample", action="store_true", help="Disable sampling saving")
     train_args = train_parser.parse_args()
 
     train_config = TrainConfig(
@@ -175,12 +165,12 @@ if __name__ == "__main__":
         out_artifact=train_args.out_artifact,
         out_checkpoint=train_args.out_checkpoint,
         out_loss_log=train_args.out_loss_log,
-        out_sampling=train_args.out_sampling,
+        out_sample=train_args.out_sample,
         n_save_interval=train_args.n_save_interval,
         no_artifact=train_args.no_artifact,
         no_checkpoint=train_args.no_checkpoint,
         no_loss_log=train_args.no_loss_log,
-        no_sampling=train_args.no_sampling,
+        no_sample=train_args.no_sample,
     )
     validate_artifact_config(artifact_config)
 
