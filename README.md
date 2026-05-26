@@ -43,9 +43,6 @@ Artifact output is controlled separately:
 | `-no-ll`, `--no-loss-log` | — | Disable loss log saving |
 | `-no-s`, `--no-sample` | — | Disable sample saving |
 
-**Plot learning curves:**
-```bash
-python loss_plot.py
 ```
 Displays train loss (raw + smoothed), val loss, and perplexity from a `loss_log.json` file. Edit `LOG_PATH` at the top of the file to point to a different run.
 
