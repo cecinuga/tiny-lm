@@ -34,9 +34,9 @@ Artifact output is controlled separately:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `-n-save`, `--n-save-interval` | 10 | How many times artifacts are saved during training |
-| `-o-art`, `--out-artifact` | `artifacts/` | Root artifact directory |
-| `-o-chk`, `--out-checkpoint` | `checkpoints/` | Checkpoint subfolder (under artifact root) |
-| `-o-l`, `--out-loss-log` | `loss_logs/` | Loss log subfolder |
+| `-o-art`, `--out-artifact` | `artifacts/` | Root artifact directory (if not exist, create that) |
+| `-o-chk`, `--out-checkpoint` | `checkpoints/` | Checkpoint subfolder ((if not exist, create that)) (under artifact root) |
+| `-o-l`, `--out-loss-log` | `loss_logs/` | Loss log subfolder (if not exist, create that) (overwrite existing) |
 | `-o-s`, `--out-sample` | `samples/` | Sample subfolder |
 | `-no-a`, `--no-artifact` | — | Disable all artifact saving |
 | `-no-c`, `--no-checkpoint` | — | Disable checkpoint saving |
