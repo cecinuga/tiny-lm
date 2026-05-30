@@ -1,4 +1,5 @@
 import torch
+from sys import stdout
 from model import GPT, GPTConfig
 
 @torch.no_grad()
@@ -27,9 +28,8 @@ def generate(model:GPT, prompt, stoi, itos, max_new_tokens=200, temperature=0.8,
 
         probs = torch.softmax(logits, dim=-1)
         next_token = torch.multinomial(probs, num_samples=1)
-        idx = torch.cat([idx, next_token], dim=1)
+        yield next_token
 
-    return "".join([itos[i] for i in idx[0].tolist()])
 
 if __name__ == "__main__":
     import argparse
@@ -56,8 +56,9 @@ if __name__ == "__main__":
     model = GPT(config)
     model.load_state_dict(checkpoint["model_state_dict"])
 
-    output = generate(model, args.prompt, stoi, itos,
+    for token in generate(model, args.prompt, stoi, itos,
                       max_new_tokens=args.max_new_tokens,
                       temperature=args.temperature,
-                      top_k=args.top_k)
-    print(output)
+                      top_k=args.top_k):
+        print(itos[token.item()], end="")
+    print()
