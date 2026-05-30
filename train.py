@@ -1,8 +1,7 @@
 from tqdm import tqdm
 from dataclasses import dataclass
-from train_utils import static_vars, load_data, validate_train_config, get_device, get_lr
+from train_utils import TrainConfig, static_vars, load_data, validate_train_config, get_device, get_lr
 from artifact_utils import save_checkpoint, validate_artifact_config, save_sample, today, model_arch, ArtifactConfig, default_checkpoint, default_loss_log, default_artifact, default_sample, save_loss_log
-from train_types import TrainConfig
 from math import floor
 import argparse
 import json
@@ -115,9 +114,8 @@ def train(
             early_stopped = early_stop(val_loss)
             if early_stopped is False:
                 save_checkpoint(model, model_config, artifact_config, step=step, stoi=stoi, itos=itos, prefix="best")
-
-        if early_stopped is True:
-            break
+            else:
+                break
 
     # Save final checkpoint only if model has not overfitted
     if early_stopped is False:

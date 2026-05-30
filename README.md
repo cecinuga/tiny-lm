@@ -85,7 +85,6 @@ Default config: 6 layers, 6 heads, 384 embedding dim, 256 context window, batch 
 
 ### 0. Improved artifacts handling
 0. every artifact name must be unique (loss logs and samples currently overwrite across runs in the same day)
-1. every artifact name must not contain any date
 2. Check for duplicate file names before saving checkpoints and loss logs 
 3. Check if paths have trailing slashes and add them if missing
 
