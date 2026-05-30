@@ -6,6 +6,8 @@ The architecture is fully parametric. There is no fixed model size: depth (`n_la
 
 ---
 
+<img src="./assets/furetto.jpeg" alt="">
+
 ## Quick start (reproduce it on your machine)
 
 **Prerequisites**
