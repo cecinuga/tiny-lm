@@ -1,4 +1,5 @@
 import torch
+from sys import stdout
 from model import GPT, GPTConfig
 
 @torch.no_grad()
