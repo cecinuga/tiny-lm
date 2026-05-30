@@ -28,6 +28,7 @@ def generate(model:GPT, prompt, stoi, itos, max_new_tokens=200, temperature=0.8,
 
         probs = torch.softmax(logits, dim=-1)
         next_token = torch.multinomial(probs, num_samples=1)
+        idx = torch.cat([idx, next_token], dim=-1)
         yield next_token
 
 
@@ -60,5 +61,7 @@ if __name__ == "__main__":
                       max_new_tokens=args.max_new_tokens,
                       temperature=args.temperature,
                       top_k=args.top_k):
-        print(itos[token.item()], end="")
+        c = itos[token.item()]
+        stdout.write(f"{c}")
+        stdout.flush()
     print()
